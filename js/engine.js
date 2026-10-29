@@ -36,7 +36,9 @@ export class Engine {
       }, 30000);
 
       try {
-        const url = CONFIG.ENGINE_SHIM + '?src=' + encodeURIComponent(CONFIG.ENGINE_CDN);
+        // Принудительно используем ASM.js версию
+      const asmUrl = 'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js?wasm=0';
+      const url = CONFIG.ENGINE_SHIM + '?src=' + encodeURIComponent(asmUrl);
         this.worker = new Worker(url);
       } catch (error) {
         this._failInit(new Error('Не удалось создать Web Worker: ' + error.message));
