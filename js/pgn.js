@@ -1,141 +1,58 @@
 import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dist/esm/chess.js';
 
-/** Удаляет вложенные варианты (...) из текста ходов. */
 function stripVariations(text) {
-  let out = '';
-  let depth = 0;
+  let out = '', depth = 0;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
-    if (ch === '(') { depth++; continue; }
-    if (ch === ')') { depth = Math.max(0, depth - 1); continue; }
-    if (depth === 0) out += ch;
+    if (ch === '(') depth++;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    else if (depth === 0) out += ch;
   }
   return out;
 }
 
-/**
- * Чистит PGN от комментариев, часов, NAG и вариантов,
- * сохраняя блок заголовков нетронутым.
- */
 export function cleanPgn(raw) {
-  let text = String(raw || '')
-    .replace(/^\uFEFF/, '')
-    .replace(/\r\n?/g, '\n');
-
-  // Отделяем заголовки от ходов по первой пустой строке.
-  let headers = '';
-  let body = text;
+  let text = String(raw || '').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+  let headers = '', body = text;
   const split = text.search(/\n\s*\n/);
   if (split >= 0) {
     headers = text.slice(0, split + 1);
     body = text.slice(split + 1);
   }
-
-  // Комментарии {…} и ;…, варианты, NAG.
-  body = body.replace(/\{[^}]*\}/g, ' ');
-  body = body.replace(/;[^\n]*/g, ' ');
-  body = stripVariations(body);
-  body = body.replace(/\$\d+/g, ' ');
-  body = body.replace(/[ \t]+/g, ' ');
-  body = body.replace(/\n{3,}/g, '\n\n');
-
-  // Если в тексте несколько партий — берём первую.
-  const secondGame = body.search(/\n\s*\[\s*Event\s+"/);
-  if (secondGame > 0) body = body.slice(0, secondGame);
-
-  return (headers ? headers.replace(/\s+$/, '') + '\n\n' : '') + body.trim();
+  body = body.replace(/\{[^}]*\}/g, ' ').replace(/;[^\n]*/g, ' ').replace(/\$\d+/g, ' ');
+  body = stripVariations(body).replace(/[ \t]+/g, ' ');
+  return (headers ? headers.trim() + '\n\n' : '') + body.trim();
 }
 
-/** Разбирает PGN и возвращает заголовки, стартовую позицию и ходы. */
 export function parsePgn(raw) {
-  if (!raw || !String(raw).trim()) {
-    throw new Error('PGN пустой — вставьте текст партии.');
-  }
-
-  const cleaned = cleanPgn(raw);
+  if (!raw || !String(raw).trim()) throw new Error('PGN пустой');
   const chess = new Chess();
-
   try {
-    chess.loadPgn(cleaned);
-  } catch (error) {
-    throw new Error('Не удалось разобрать PGN: ' + (error.message || 'неизвестная ошибка') + '. Проверьте, что это корректная партия.');
+    chess.loadPgn(cleanPgn(raw));
+  } catch (e) {
+    throw new Error('Ошибка в PGN: ' + e.message);
   }
-
   const moves = chess.history({ verbose: true });
-  if (!moves.length) {
-    throw new Error('В PGN не найдено ни одного хода.');
-  }
-
-  const headers = chess.getHeaders();
-  const startFen = moves[0].before;
-
-  return {
-    headers,
-    startFen,
-    moves,
-    finalFen: moves[moves.length - 1].after,
-  };
-}
-
-/** «2026.10.28» → «28.10.2026». */
-export function formatPgnDate(value) {
-  if (!value) return '—';
-  const match = String(value).match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
-  if (!match) return String(value);
-  return match[3].padStart(2, '0') + '.' + match[2].padStart(2, '0') + '.' + match[1];
+  if (!moves.length) throw new Error('В PGN нет ходов');
+  return { headers: chess.getHeaders(), startFen: moves[0].before, moves };
 }
 
 export function formatTimestamp(seconds) {
   if (!seconds) return '—';
-  try {
-    return new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(seconds * 1000));
-  } catch (_) {
-    return '—';
-  }
+  try { return new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(seconds * 1000)); } catch (_) { return '—'; }
 }
 
-/** Приводит результат PGN к красивому виду. */
-export function resultScore(result) {
-  if (result === '1-0') return '1–0';
-  if (result === '0-1') return '0–1';
-  if (result === '1/2-1/2') return '½–½';
-  return '*';
-}
+export function resultScore(r) { return r === '1-0' ? '1–0' : r === '0-1' ? '0–1' : r === '1/2-1/2' ? '½–½' : '*'; }
+export function resultLabel(r) { return r === '1-0' ? 'Победа белых' : r === '0-1' ? 'Победа чёрных' : r === '1/2-1/2' ? 'Ничья' : 'Партия'; }
 
-export function resultLabel(result) {
-  if (result === '1-0') return 'Победа белых';
-  if (result === '0-1') return 'Победа чёрных';
-  if (result === '1/2-1/2') return 'Ничья';
-  return 'Партия';
-}
-
-function cleanElo(value) {
-  if (!value || value === '?' || value === '0') return null;
-  const number = parseInt(value, 10);
-  return Number.isFinite(number) ? number : null;
-}
-
-/** Собирает метаданные партии из PGN-заголовков. */
-export function gameMetaFromHeaders(headers, fallback = {}) {
-  const whiteName = headers.White || fallback.whiteName || 'Белые';
-  const blackName = headers.Black || fallback.blackName || 'Чёрные';
-  const ecoParts = [headers.ECO, headers.Opening].filter(Boolean);
-
+export function gameMetaFromHeaders(h, fallback = {}) {
   return {
-    white: {
-      name: whiteName,
-      elo: cleanElo(headers.WhiteElo) || fallback.whiteElo || null,
-    },
-    black: {
-      name: blackName,
-      elo: cleanElo(headers.BlackElo) || fallback.blackElo || null,
-    },
-    result: headers.Result || fallback.result || '*',
-    date: formatPgnDate(headers.Date || headers.UTCDate || fallback.date),
-    event: headers.Event || fallback.event || 'Партия',
-    eco: ecoParts.join(' · '),
-    site: headers.Site || '',
-    source: fallback.source || 'PGN',
-    url: fallback.url || headers.Link || '',
+    white: { name: h.White || fallback.whiteName || 'Белые', elo: parseInt(h.WhiteElo) || fallback.whiteElo || null },
+    black: { name: h.Black || fallback.blackName || 'Чёрные', elo: parseInt(h.BlackElo) || fallback.blackElo || null },
+    result: h.Result || fallback.result || '*',
+    date: h.Date ? h.Date.replace(/\./g, '.') : (fallback.date || '—'),
+    event: h.Event || fallback.event || 'Партия',
+    eco: [h.ECO, h.Opening].filter(Boolean).join(' · '),
+    source: fallback.source || 'PGN'
   };
 }

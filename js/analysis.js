@@ -1,129 +1,75 @@
 import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dist/esm/chess.js';
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+const abortError = () => { const e = new Error('AbortError'); e.name = 'AbortError'; return e; };
 
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
+export function winPercent(cp, mate) {
+  if (mate !== null) return mate > 0 ? 100 : 0;
+  return 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * clamp(cp || 0, -1500, 1500))) - 1);
 }
 
-function abortError() {
-  const error = new Error('Анализ отменён');
-  error.name = 'AbortError';
-  return error;
-}
-
-/** Вероятность победы (0–100) по оценке в сантипешках. */
-export function winPercent(cp, mate = null) {
-  if (mate !== null && mate !== undefined) return mate > 0 ? 100 : 0;
-  const safe = clamp(cp || 0, -1500, 1500);
-  return 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * safe)) - 1);
-}
-
-/** Переводит оценку движка (от стороны, которая ходит) в оценку белых. */
-export function whiteEval(fen, evaluation) {
-  const turn = (fen.split(' ')[1] || 'w');
-  if (evaluation.mate !== null && evaluation.mate !== undefined) {
-    const whiteMate = turn === 'w' ? evaluation.mate : -evaluation.mate;
-    return {
-      cp: whiteMate > 0 ? 20000 : -20000,
-      mate: whiteMate === 0 ? -0.001 : whiteMate,
-    };
+export function whiteEval(fen, ev) {
+  const turn = fen.split(' ')[1] || 'w';
+  if (ev.mate !== null) {
+    const m = turn === 'w' ? ev.mate : -ev.mate;
+    return { cp: m > 0 ? 20000 : -20000, mate: m };
   }
-  const cp = Number.isFinite(evaluation.cp) ? evaluation.cp : 0;
+  const cp = Number.isFinite(ev.cp) ? ev.cp : 0;
   return { cp: turn === 'w' ? cp : -cp, mate: null };
 }
 
-function uciOf(move) {
-  return move.from + move.to + (move.promotion || '');
-}
-
-function sanForUci(fen, uci) {
+function getUci(m) { return m.from + m.to + (m.promotion || ''); }
+function getSan(fen, uci) {
   if (!uci || uci.length < 4) return null;
   try {
-    const chess = new Chess(fen);
-    const move = chess.move({
-      from: uci.slice(0, 2),
-      to: uci.slice(2, 4),
-      promotion: uci[4] || undefined,
-    });
-    return move ? move.san : null;
-  } catch (_) {
-    return null;
-  }
+    const c = new Chess(fen);
+    const m = c.move({ from: uci.slice(0,2), to: uci.slice(2,4), promotion: uci[4] || undefined });
+    return m ? m.san : null;
+  } catch (_) { return null; }
 }
 
-function pvToSan(fen, pv, limit = 7) {
-  if (!Array.isArray(pv) || !pv.length) return [];
-  const chess = new Chess(fen);
-  const result = [];
-  for (const uci of pv.slice(0, limit)) {
+function getPvSan(fen, pv) {
+  const c = new Chess(fen), res = [];
+  for (const uci of pv.slice(0, 7)) {
     try {
-      const move = chess.move({
-        from: uci.slice(0, 2),
-        to: uci.slice(2, 4),
-        promotion: uci[4] || undefined,
-      });
-      if (!move) break;
-      result.push(move.san);
-    } catch (_) {
-      break;
-    }
+      const m = c.move({ from: uci.slice(0,2), to: uci.slice(2,4), promotion: uci[4] || undefined });
+      if (m) res.push(m.san); else break;
+    } catch (_) { break; }
   }
-  return result;
+  return res;
 }
 
-function materialBalance(fen, color) {
-  const board = fen.split(' ')[0] || '';
-  let score = 0;
-  for (const char of board) {
-    const lower = char.toLowerCase();
-    const value = PIECE_VALUE[lower];
-    if (!value) continue;
-    const isWhite = char === char.toUpperCase();
-    const sign = isWhite ? 1 : -1;
-    score += sign * value;
+function calcMaterial(fen, color) {
+  let sc = 0;
+  for (const ch of fen.split(' ')[0]) {
+    const val = PIECE_VALUE[ch.toLowerCase()];
+    if (val) sc += (ch === ch.toUpperCase() ? 1 : -1) * val;
   }
-  return color === 'w' ? score : -score;
+  return color === 'w' ? sc : -sc;
 }
 
-/** Эвристика жертвы: фигура под боем и защитников не больше, чем атакующих. */
-function isHangingSacrifice(fenAfter, square, mover) {
+function isSacrifice(fen, square, mover) {
   try {
-    const chess = new Chess(fenAfter);
-    const piece = chess.get(square);
-    if (!piece || piece.color !== mover) return false;
-    const value = PIECE_VALUE[piece.type] || 0;
-    if (value < 3) return false;
-
-    const opponent = mover === 'w' ? 'b' : 'w';
-    const attackers = chess.attackers(square, opponent);
-    if (!attackers.length) return false;
-
-    const defenders = chess.attackers(square, mover);
-    if (defenders.length === 0) return true;
-
-    let cheapestAttacker = 99;
-    for (const attackerSquare of attackers) {
-      const attacker = chess.get(attackerSquare);
-      if (attacker) cheapestAttacker = Math.min(cheapestAttacker, PIECE_VALUE[attacker.type] || 0);
-    }
-    return cheapestAttacker < value && defenders.length <= attackers.length;
-  } catch (_) {
-    return false;
-  }
+    const c = new Chess(fen), piece = c.get(square);
+    if (!piece || piece.color !== mover || PIECE_VALUE[piece.type] < 3) return false;
+    const opp = mover === 'w' ? 'b' : 'w';
+    const att = c.attackers(square, opp), def = c.attackers(square, mover);
+    if (!att.length) return false;
+    if (!def.length) return true;
+    let cheapest = 99;
+    for (const a of att) { const p = c.get(a); if (p) cheapest = Math.min(cheapest, PIECE_VALUE[p.type]); }
+    return cheapest < PIECE_VALUE[piece.type] && def.length <= att.length;
+  } catch (_) { return false; }
 }
 
-/** Точность одного хода по потерянному проценту вероятности победы. */
-function moveAccuracy(loss) {
-  const raw = 103.1668 * Math.exp(-0.04354 * loss) - 3.1669;
-  return clamp(raw, 0, 100);
-}
+function accuracyFromLoss(loss) { return clamp(103.1668 * Math.exp(-0.04354 * loss) - 3.1669, 0, 100); }
 
-function classifyMove({ isBest, loss, winBefore, winAfter, deliveredMate, missedMate, sacrifice }) {
-  if (deliveredMate) return 'best';
+function classify({ isBest, loss, winB, winA, delivMate, missedMate, sac }) {
+  if (delivMate) return 'best';
   if (missedMate) return 'miss';
-  if (isBest && sacrifice && winAfter >= 45) return 'brilliant';
-  if (isBest && winBefore < 50 && winAfter - winBefore >= 12) return 'great';
+  if (isBest && sac && winA >= 45) return 'brilliant';
+  if (isBest && winB < 50 && winA - winB >= 12) return 'great';
   if (isBest) return 'best';
   if (loss < 2) return 'excellent';
   if (loss < 5) return 'good';
@@ -132,155 +78,67 @@ function classifyMove({ isBest, loss, winBefore, winAfter, deliveredMate, missed
   return 'blunder';
 }
 
-function emptyCounts() {
-  return {
-    brilliant: 0, great: 0, best: 0, excellent: 0, good: 0,
-    inaccuracy: 0, mistake: 0, blunder: 0, miss: 0,
-  };
-}
+function emptyCounts() { return { brilliant:0, great:0, best:0, excellent:0, good:0, inaccuracy:0, mistake:0, blunder:0, miss:0 }; }
 
-/**
- * Оценивает все позиции партии и классифицирует ходы.
- */
-export async function analyzeGame({
-  moves,
-  startFen,
-  engine,
-  depth,
-  onProgress = () => {},
-  isCancelled = () => false,
-}) {
-  const positions = [startFen, ...moves.map((move) => move.after)];
-  const evaluations = [];
+export async function analyzeGame({ moves, startFen, engine, depth, onProgress, isCancelled }) {
+  const positions = [startFen, ...moves.map(m => m.after)];
+  const evals = [];
 
-  for (let index = 0; index < positions.length; index++) {
+  for (let i = 0; i < positions.length; i++) {
     if (isCancelled()) throw abortError();
-
-    onProgress(index, positions.length);
-    const fen = positions[index];
-    const chess = new Chess(fen);
-
-    let evaluation;
-    if (chess.isCheckmate()) {
-      evaluation = {
-        cp: chess.turn() === 'w' ? -20000 : 20000,
-        mate: null,
-        bestMove: null,
-        pv: [],
-        terminal: 'mate',
-      };
-    } else if (chess.isDraw() || chess.isStalemate() || chess.isInsufficientMaterial()) {
-      evaluation = { cp: 0, mate: null, bestMove: null, pv: [], terminal: 'draw' };
-    } else {
-      evaluation = await engine.evaluate(fen, { depth });
-    }
-
-    evaluations.push(evaluation);
-    onProgress(index + 1, positions.length);
-
+    onProgress(i, positions.length);
+    
+    const fen = positions[i], c = new Chess(fen);
+    let ev;
+    if (c.isCheckmate()) ev = { cp: c.turn() === 'w' ? -20000 : 20000, mate: null, bestMove: null, pv: [] };
+    else if (c.isDraw() || c.isStalemate()) ev = { cp: 0, mate: null, bestMove: null, pv: [] };
+    else ev = await engine.evaluate(fen, { depth });
+    
+    evals.push(ev);
+    onProgress(i + 1, positions.length);
     if (isCancelled()) throw abortError();
   }
 
-  return buildAnalysis({ moves, positions, evaluations, depth });
-}
+  const moveStats = [], counts = { w: emptyCounts(), b: emptyCounts() }, lossSum = { w: 0, b: 0 }, cpLossSum = { w: 0, b: 0 }, mCount = { w: 0, b: 0 };
 
-function buildAnalysis({ moves, positions, evaluations, depth }) {
-  const moveAnalyses = [];
-  const counts = { w: emptyCounts(), b: emptyCounts() };
-  const lossSum = { w: 0, b: 0 };
-  const cpLossSum = { w: 0, b: 0 };
-  const moveCount = { w: 0, b: 0 };
+  for (let i = 0; i < moves.length; i++) {
+    const m = moves[i], before = evals[i], after = evals[i + 1];
+    const bW = whiteEval(m.before, before), aW = whiteEval(m.after, after);
+    const sign = m.color === 'w' ? 1 : -1;
+    
+    const mateB = bW.mate === null ? null : bW.mate * sign;
+    const mateA = aW.mate === null ? null : aW.mate * sign;
+    const cpB = bW.cp * sign, cpA = aW.cp * sign;
 
-  for (let index = 0; index < moves.length; index++) {
-    const move = moves[index];
-    const before = evaluations[index];
-    const after = evaluations[index + 1];
+    const winB = winPercent(cpB, mateB), winA = winPercent(cpA, mateA);
+    const loss = clamp(winB - winA, 0, 100);
+    const cpLoss = mateB !== null || mateA !== null ? (loss > 0 ? 1000 : 0) : clamp(cpB - cpA, 0, 1000);
 
-    const beforeWhite = whiteEval(move.before, before);
-    const afterWhite = whiteEval(move.after, after);
+    const playedUci = getUci(m), bestUci = before.bestMove;
+    const isBest = bestUci === playedUci;
+    const delivMate = /#/.test(m.san);
+    const missedMate = !delivMate && mateB > 0 && !(mateA > 0) && loss >= 8;
 
-    const sign = move.color === 'w' ? 1 : -1;
-    const mateBeforeMover = beforeWhite.mate === null ? null : beforeWhite.mate * sign;
-    const mateAfterMover = afterWhite.mate === null ? null : afterWhite.mate * sign;
-    const cpBeforeMover = beforeWhite.cp * sign;
-    const cpAfterMover = afterWhite.cp * sign;
+    const matDelta = calcMaterial(m.after, m.color) - calcMaterial(m.before, m.color);
+    const sac = isSacrifice(m.after, m.to, m.color) || matDelta <= -1.9;
+    const classification = classify({ isBest, loss, winB, winA, delivMate, missedMate, sac });
 
-    const winBefore = winPercent(cpBeforeMover, mateBeforeMover);
-    const winAfter = winPercent(cpAfterMover, mateAfterMover);
-    const loss = clamp(winBefore - winAfter, 0, 100);
+    counts[m.color][classification]++;
+    lossSum[m.color] += loss; cpLossSum[m.color] += cpLoss; mCount[m.color]++;
 
-    let cpLoss;
-    if (mateBeforeMover !== null || mateAfterMover !== null) {
-      cpLoss = loss > 0 ? 1000 : 0;
-    } else {
-      cpLoss = clamp(cpBeforeMover - cpAfterMover, 0, 1000);
-    }
-
-    const playedUci = uciOf(move);
-    const bestUci = before.bestMove || null;
-    const isBest = !!bestUci && bestUci === playedUci;
-    const deliveredMate = /#/.test(move.san);
-    const missedMate = !deliveredMate
-      && mateBeforeMover !== null && mateBeforeMover > 0
-      && !(mateAfterMover !== null && mateAfterMover > 0)
-      && loss >= 8;
-
-    const materialDelta = materialBalance(move.after, move.color) - materialBalance(move.before, move.color);
-    const sacrifice = isHangingSacrifice(move.after, move.to, move.color) || materialDelta <= -1.9;
-
-    const classification = classifyMove({
-      isBest, loss, winBefore, winAfter, deliveredMate, missedMate, sacrifice,
-    });
-
-    counts[move.color][classification] += 1;
-    lossSum[move.color] += loss;
-    cpLossSum[move.color] += cpLoss;
-    moveCount[move.color] += 1;
-
-    moveAnalyses.push({
-      ...move,
-      ply: index + 1,
-      uci: playedUci,
-      evalBeforeWhite: beforeWhite,
-      evalAfterWhite: afterWhite,
-      winBefore,
-      winAfter,
-      loss,
-      cpLoss,
-      accuracy: moveAccuracy(loss),
-      bestMove: bestUci,
-      bestSan: bestUci ? sanForUci(move.before, bestUci) : null,
-      pvSan: pvToSan(move.before, before.pv),
-      isBest,
-      sacrifice,
-      materialDelta,
-      classification,
+    moveStats.push({
+      ...m, ply: i + 1, uci: playedUci, evalBeforeWhite: bW, evalAfterWhite: aW,
+      winBefore: winB, winAfter: winA, loss, cpLoss, accuracy: accuracyFromLoss(loss),
+      bestMove: bestUci, bestSan: getSan(m.before, bestUci), pvSan: getPvSan(m.before, before.pv),
+      isBest, sacrifice: sac, materialDelta: matDelta, classification
     });
   }
 
-  const points = evaluations.map((evaluation, index) => {
-    const white = whiteEval(positions[index], evaluation);
-    return { ply: index, cp: white.cp, mate: white.mate };
-  });
-
-  function summarize(color) {
-    const total = moveCount[color] || 1;
-    const averageLoss = lossSum[color] / total;
-    const accuracy = clamp(103.1668 * Math.exp(-0.04354 * averageLoss) - 3.1669, 0, 100);
-    return {
-      accuracy,
-      acpl: Math.round(cpLossSum[color] / total),
-      counts: counts[color],
-      moves: moveCount[color],
-    };
-  }
-
-  return {
-    moves: moveAnalyses,
-    summary: { w: summarize('w'), b: summarize('b') },
-    points,
-    evaluations,
-    positions,
-    depth,
+  const points = evals.map((ev, i) => ({ ply: i, ...whiteEval(positions[i], ev) }));
+  const summ = (col) => {
+    const tot = mCount[col] || 1;
+    return { accuracy: accuracyFromLoss(lossSum[col] / tot), acpl: Math.round(cpLossSum[col] / tot), counts: counts[col] };
   };
+
+  return { moves: moveStats, summary: { w: summ('w'), b: summ('b') }, points, evaluations: evals, positions, depth };
 }

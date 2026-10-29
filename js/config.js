@@ -1,31 +1,27 @@
 /**
- * Общие настройки ChessLab.
- * Все внешние зависимости подключаются с CDN — сборка не требуется.
+ * Настройки приложения.
  */
 export const CONFIG = {
-  // Явно указываем asm.js версию (без WASM), чтобы не было проблем с CORS
-  ENGINE_CDN: 'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js?wasm=0',
+  // Используем асм.жс версию (без WASM), чтобы обойти CORS
+  ENGINE_URLS: [
+    'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js?wasm=0',
+    'https://unpkg.com/stockfish.js@10.0.2/stockfish.js?wasm=0',
+    'https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js?wasm=0'
+  ],
   ENGINE_DEFAULT_DEPTH: 12,
-  ENGINE_TIMEOUT_MS: 90000,
-
+  ENGINE_TIMEOUT_MS: 120000, // 2 минуты на ответ движка
   CHESSCOM_API: 'https://api.chess.com/pub',
-  CHESSCOM_MAX_GAMES: 24,
-  CHESSCOM_CACHE_MS: 10 * 60 * 1000,
-
-  EVAL_CLAMP: 6, // график ограничен ±6 пешками
+  EVAL_CLAMP: 6
 };
 
-/** Классификация ходов: подписи, символы и цвета. */
 export const CLASSES = {
-  brilliant: { label: 'Блестящий ход', short: 'Блестящий', symbol: '!!', color: '#2dd4bf' },
-  great:     { label: 'Отличный ход',  short: 'Отличный',  symbol: '!',  color: '#60a5fa' },
-  best:      { label: 'Лучший ход',    short: 'Лучший',    symbol: '★',  color: '#a3e635' },
-  excellent: { label: 'Отлично',       short: 'Отлично',   symbol: '✓',  color: '#86efac' },
-  good:      { label: 'Хорошо',        short: 'Хорошо',    symbol: '·',  color: '#cbd5e1' },
-  inaccuracy:{ label: 'Неточность',    short: 'Неточность',symbol: '?!', color: '#fbbf24' },
-  mistake:   { label: 'Ошибка',        short: 'Ошибка',    symbol: '?',  color: '#fb923c' },
-  blunder:   { label: 'Зевок',         short: 'Зевок',     symbol: '??', color: '#f87171' },
-  miss:      { label: 'Упущенный мат', short: 'Упущенный мат', symbol: '✗', color: '#f87171' },
+  brilliant: { label: 'Блестящий ход', short: '!!', color: '#2dd4bf' },
+  great:     { label: 'Отличный ход',  short: '!',  color: '#60a5fa' },
+  best:      { label: 'Лучший ход',    short: '★',  color: '#a3e635' },
+  excellent: { label: 'Отлично',       short: '✓',  color: '#86efac' },
+  good:      { label: 'Хорошо',        short: '·',  color: '#cbd5e1' },
+  inaccuracy:{ label: 'Неточность',    short: '?!', color: '#fbbf24' },
+  mistake:   { label: 'Ошибка',        short: '?',  color: '#fb923c' },
+  blunder:   { label: 'Зевок',         short: '??', color: '#f87171' },
+  miss:      { label: 'Упущенный мат', short: '✗',  color: '#f87171' },
 };
-
-export const CLASS_KEYS = Object.keys(CLASSES);

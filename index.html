@@ -4,32 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0b0d10">
-  <meta name="description" content="ChessLab — бесплатный анализатор шахматных партий. Загрузите партию с Chess.com или PGN, и Stockfish найдёт ошибки, зевки и лучшие ходы.">
   <title>ChessLab — анализатор шахматных партий</title>
 
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230b0d10'/%3E%3Ctext x='50' y='72' font-size='64' text-anchor='middle' fill='%238fbf5a'%3E%E2%99%9E%3C/text%3E%3C/svg%3E">
-
-  <!-- Глушим надоедливые предупреждения библиотеки cm-chessboard -->
-  <script>
-    const originalWarn = console.warn;
-    console.warn = function(...args) {
-      if (args[0] && String(args[0]).includes('without parentNode')) return;
-      originalWarn.apply(console, args);
-    };
-    const originalError = console.error;
-    console.error = function(...args) {
-      if (args[0] && String(args[0]).includes('without parentNode')) return;
-      originalError.apply(console, args);
-    };
-  </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cm-chessboard@8.12.3/assets/chessboard.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cm-chessboard@8.12.3/assets/extensions/markers/markers.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cm-chessboard@8.12.3/assets/extensions/arrows/arrows.css">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -44,6 +26,7 @@
       <span class="engine-dot"></span>
       <span id="enginePillText">Stockfish · ожидание</span>
     </span>
+    <button class="btn btn-ghost" id="settingsBtn" type="button">⚙️ Настройки</button>
     <button class="btn btn-ghost" id="newGameBtn" type="button">Новая партия</button>
   </div>
 </header>
@@ -106,12 +89,6 @@
         <p class="muted small">Подойдут партии с Lichess, Chess.com и любых шахматных программ.</p>
       </div>
     </div>
-
-    <div class="home-foot">
-      <div class="foot-item"><b>1</b><span>Загрузите партию</span></div>
-      <div class="foot-item"><b>2</b><span>Дождитесь разбора</span></div>
-      <div class="foot-item"><b>3</b><span>Изучайте ошибки и лучшие ходы</span></div>
-    </div>
   </section>
 
   <!-- ================= АНАЛИЗ ================= -->
@@ -158,18 +135,21 @@
             <span class="eval-label" id="evalLabel">0.00</span>
             <div class="evalbar"><div class="eval-fill" id="evalFill"></div></div>
           </div>
-          <div class="board-wrap"><div id="board"></div></div>
+          <div class="board-wrap" id="boardWrap">
+            <!-- Наша кастомная доска -->
+            <div id="board" class="chessboard"></div>
+          </div>
         </div>
 
         <div class="board-controls">
           <div class="nav-group">
-            <button class="icon-btn" id="firstBtn" type="button" title="В начало" aria-label="В начало">«</button>
-            <button class="icon-btn" id="prevBtn" type="button" title="Предыдущий ход" aria-label="Предыдущий ход">‹</button>
-            <button class="icon-btn" id="nextBtn" type="button" title="Следующий ход" aria-label="Следующий ход">›</button>
-            <button class="icon-btn" id="lastBtn" type="button" title="В конец" aria-label="В конец">»</button>
+            <button class="icon-btn" id="firstBtn" type="button" title="В начало">«</button>
+            <button class="icon-btn" id="prevBtn" type="button" title="Предыдущий ход">‹</button>
+            <button class="icon-btn" id="nextBtn" type="button" title="Следующий ход">›</button>
+            <button class="icon-btn" id="lastBtn" type="button" title="В конец">»</button>
           </div>
           <span class="move-counter" id="moveCounter">Ход 0 / 0</span>
-          <button class="icon-btn" id="flipBtn" type="button" title="Перевернуть доску" aria-label="Перевернуть доску">⇅</button>
+          <button class="icon-btn" id="flipBtn" type="button" title="Перевернуть доску">⇅</button>
         </div>
 
         <div class="player-card" id="whiteCard">
@@ -208,18 +188,13 @@
 </main>
 
 <!-- Модальное окно PGN -->
-<div class="modal hidden" id="pgnModal" role="dialog" aria-modal="true" aria-labelledby="pgnModalTitle">
+<div class="modal hidden" id="pgnModal">
   <div class="modal-card">
     <div class="modal-head">
-      <h2 id="pgnModalTitle">Вставьте PGN</h2>
-      <button class="icon-btn" id="pgnCloseBtn" type="button" aria-label="Закрыть">✕</button>
+      <h2>Вставьте PGN</h2>
+      <button class="icon-btn" id="pgnCloseBtn" type="button">✕</button>
     </div>
-    <textarea id="pgnTextarea" spellcheck="false" placeholder="[Event &quot;Casual Game&quot;]
-[White &quot;Player One&quot;]
-[Black &quot;Player Two&quot;]
-[Result &quot;1-0&quot;]
-
-1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. b4 Bxb4 5. c3 Ba5 6. d4 exd4 7. O-O d3 8. Qb3 Qf6 9. e5 Qg6 10. Re1 Nge7 11. Ba3 b5 12. Qxb5 Rb8 13. Qa4 Bb6 14. Nbd2 Bb7 15. Ne4 Qf5 16. Bxd3 Qh5 17. Nf6+ gxf6 18. exf6 Rg8 19. Rad1 Qxf3 20. Rxe7+ Nxe7 21. Qxd7+ Kxd7 22. Bf5+ Ke8 23. Bd7+ Kf8 24. Bxe7# 1-0"></textarea>
+    <textarea id="pgnTextarea" spellcheck="false" placeholder="[Event &quot;Casual Game&quot;]..."></textarea>
     <div class="modal-error hidden" id="pgnError"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="pgnCancelBtn" type="button">Отмена</button>
@@ -228,12 +203,47 @@
   </div>
 </div>
 
+<!-- Модальное окно настроек -->
+<div class="modal hidden" id="settingsModal">
+  <div class="modal-card settings-card">
+    <div class="modal-head">
+      <h2>Настройки</h2>
+      <button class="icon-btn" id="settingsCloseBtn" type="button">✕</button>
+    </div>
+    <div class="settings-content">
+      <div class="setting-item">
+        <label>Тема доски</label>
+        <select id="boardThemeSelect">
+          <option value="green">Зеленая (Chess.com)</option>
+          <option value="brown">Деревянная (Lichess)</option>
+          <option value="blue">Синяя (Ice)</option>
+          <option value="dark">Тёмная (Midnight)</option>
+        </select>
+      </div>
+      <div class="setting-item">
+        <label>Стиль фигур</label>
+        <select id="pieceStyleSelect">
+          <option value="classic">Классика</option>
+          <option value="neo">Нео</option>
+        </select>
+      </div>
+      <div class="setting-item">
+        <label>Показывать координаты</label>
+        <label class="switch"><input type="checkbox" id="showCoordsCheckbox" checked><span class="slider"></span></label>
+      </div>
+      <div class="setting-item">
+        <label>Анимация ходов</label>
+        <label class="switch"><input type="checkbox" id="animationsCheckbox" checked><span class="slider"></span></label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="settingsSaveBtn" type="button">Сохранить</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status"></div>
 
-<noscript>
-  <div class="noscript">Для работы ChessLab нужен JavaScript.</div>
-</noscript>
-
-<script type="module" src="js/app.js?v=2"></script>
+<script type="module" src="js/app.js?v=3"></script>
 </body>
 </html>
