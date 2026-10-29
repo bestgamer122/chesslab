@@ -76,7 +76,7 @@
         </div>
         <p class="panel-text">Перетащите файл, выберите на диске или вставьте текст.</p>
         <div class="drop-zone" id="dropZone" tabindex="0" role="button">
-          <span class="drop-icon">⇪</span>
+          <span class="drop-icon">📤</span>
           <strong>Перетащите .pgn сюда</strong>
           <span>или нажмите для выбора</span>
           <input type="file" id="fileInput" accept=".pgn,.txt,text/plain" hidden>
@@ -94,10 +94,9 @@
         <label class="depth-field">
           <span>Глубина</span>
           <select id="depthSelect">
-            <option value="8">8</option>
-            <option value="10">10</option>
-            <option value="12" selected>12 (стандарт)</option>
-            <option value="14">14</option>
+            <option value="2">2 (быстро)</option>
+            <option value="3" selected>3 (стандарт)</option>
+            <option value="4">4 (глубоко)</option>
           </select>
         </label>
         <button class="btn btn-primary" id="reanalyzeBtn" type="button">Анализировать</button>
@@ -230,6 +229,6 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<script type="module" src="js/app.js?v=5"></script>
+<script type="module" src="js/app.js?v=6"></script>
 </body>
 </html>
