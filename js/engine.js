@@ -20,14 +20,22 @@ export class Engine {
       this._resolve = resolve;
       
       try {
-        // Скачиваем wasm с CDN, так как гитхаб не позволяет >25мб
-        const wasmCdn = 'https://cdn.jsdelivr.net/gh/nmrugg/stockfish.js@v16.0.0/stockfish-16-single.wasm';
-        const res = await fetch(wasmCdn);
-        if (!res.ok) throw new Error('Не удалось скачать WASM с CDN: ' + res.status);
-        
-        const wasmBlob = await res.blob();
+        // Берем официальную версию Stockfish 16 из NPM
+        const jsUrl = 'https://cdn.jsdelivr.net/npm/stockfish@16.0.0/src/stockfish-nnue-16-single.js';
+        const wasmUrl = 'https://cdn.jsdelivr.net/npm/stockfish@16.0.0/src/stockfish-nnue-16-single.wasm';
+
+        // 1. Скачиваем WASM в память
+        const wasmRes = await fetch(wasmUrl);
+        if (!wasmRes.ok) throw new Error('WASM fetch error ' + wasmRes.status);
+        const wasmBlob = await wasmRes.blob();
         const wasmBlobUrl = URL.createObjectURL(wasmBlob);
 
+        // 2. Скачиваем JS в память
+        const jsRes = await fetch(jsUrl);
+        if (!jsRes.ok) throw new Error('JS fetch error ' + jsRes.status);
+        const jsCode = await jsRes.text();
+
+        // 3. Воркер перехватывает запрос wasm и подсовывает скачанный из памяти
         const workerCode = `
           const originalFetch = self.fetch;
           self.fetch = function(url, options) {
@@ -36,23 +44,18 @@ export class Engine {
             }
             return originalFetch(url, options);
           };
-          try {
-            importScripts('js/stockfish-19-single.js');
-          } catch (e) {
-            postMessage('__ERROR__ ' + e.message);
-          }
+          ${jsCode}
         `;
         
         const blob = new Blob([workerCode], { type: 'application/javascript' });
         this.worker = new Worker(URL.createObjectURL(blob));
       } catch (err) {
-        return reject(new Error('Ошибка инициализации: ' + err.message));
+        return reject(new Error('Ошибка загрузки движка: ' + err.message));
       }
 
-      this.worker.onerror = (e) => reject(new Error('Ошибка воркера: ' + e.message));
+      this.worker.onerror = (e) => reject(new Error('Worker error: ' + e.message));
       this.worker.onmessage = (e) => {
         const line = String(e.data || '');
-        if (line.startsWith('__ERROR__')) return reject(new Error(line));
         this._handleLine(line);
       };
 
