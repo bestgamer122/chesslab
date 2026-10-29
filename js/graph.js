@@ -21,7 +21,15 @@ export class EvalGraph {
     this._draw();
   }
 
-  setData(points, cur = 0) { this.points = points || []; this.current = cur; this.hoverIndex = null; this._draw(); }
+  setData(points, cur = 0) { 
+    this.points = points || []; 
+    this.current = cur; 
+    this.hoverIndex = null; 
+    // Принудительно триггерим ресайз, если элемент был скрыт
+    this.canvas.width = 1; this.canvas.width = this.canvas.clientWidth * (window.devicePixelRatio || 1);
+    this._draw(); 
+  }
+  
   setCurrent(idx) { this.current = idx; this._draw(); }
 
   _getIdx(x) {
@@ -33,7 +41,12 @@ export class EvalGraph {
   _draw() {
     const dpr = window.devicePixelRatio || 1;
     const w = this.canvas.clientWidth, h = 170;
-    this.canvas.width = w * dpr; this.canvas.height = h * dpr;
+    
+    if (this.canvas.width !== w * dpr) {
+      this.canvas.width = w * dpr; 
+      this.canvas.height = h * dpr;
+    }
+
     const ctx = this.ctx;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);

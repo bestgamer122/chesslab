@@ -243,6 +243,7 @@ function loadGame(parsed, meta, orientation) {
   renderGameMeta();
   renderPlayers();
   renderMoveList();
+  graph.setData([], 0); // Очищаем график
   goToPly(0);
   
   setTimeout(() => startAnalysis(false), 200);
@@ -256,15 +257,13 @@ function leaveAnalysis() {
 
 async function startAnalysis(isManual) {
   if (!state.game || state.busy) return;
-  
-  // Сброс предыдущего движка перед новым анализом
   if (engine) engine.stop();
   
   const runId = ++state.runId;
   state.busy = true;
   state.analysis = null;
   
-  renderSummary(); renderMoveList(); goToPly(0);
+  renderSummary(); renderMoveList(); graph.setData([], 0); goToPly(0);
   $('#progressWrap').classList.remove('hidden');
   $('#cancelBtn').classList.remove('hidden');
   $('#reanalyzeBtn').disabled = true;
@@ -283,7 +282,10 @@ async function startAnalysis(isManual) {
     if (runId !== state.runId) return;
     state.analysis = analysis;
     
-    renderSummary(); renderMoveList(); goToPly(state.ply);
+    renderSummary(); 
+    renderMoveList(); 
+    goToPly(state.ply);
+    graph.setData(analysis.points, state.ply); // <--- ВОТ ЭТА СТРОЧКА БЫЛА ПРОЕБАНА
     if (isManual) toast('Готово');
   } catch (err) {
     if (err.message !== 'AbortError' && runId === state.runId) {
@@ -306,9 +308,7 @@ function cancelAnalysis(silent) {
   state.runId++;
   state.busy = false;
   
-  if (engine && typeof engine.stop === 'function') {
-    engine.stop();
-  }
+  if (engine && typeof engine.stop === 'function') engine.stop();
   
   $('#progressWrap').classList.add('hidden');
   $('#cancelBtn').classList.add('hidden');
@@ -405,19 +405,27 @@ function renderSummary() {
     return;
   }
   const w = state.analysis.summary.w, b = state.analysis.summary.b;
+  
+  // Вернул плашки со статистикой
   p.innerHTML = `
     <div class="panel-head"><h2>Точность</h2></div>
     <div class="acc-grid">
       <div class="acc-card">
         <div class="acc-top"><span class="dot white"></span>Белые<span class="acc-num">${w.accuracy.toFixed(1)}%</span></div>
         <div class="acc-track"><span style="width:${w.accuracy}%; background: var(--accent)"></span></div>
-        <div class="acc-sub">ACPL ${w.acpl} · зевков ${w.counts.blunder}</div>
+        <div class="acc-sub">ACPL ${w.acpl}</div>
       </div>
       <div class="acc-card">
         <div class="acc-top"><span class="dot black"></span>Чёрные<span class="acc-num">${b.accuracy.toFixed(1)}%</span></div>
         <div class="acc-track"><span style="width:${b.accuracy}%; background: #8fa3bd"></span></div>
-        <div class="acc-sub">ACPL ${b.acpl} · зевков ${b.counts.blunder}</div>
+        <div class="acc-sub">ACPL ${b.acpl}</div>
       </div>
+    </div>
+    <div class="cls-row">
+      <span class="cls-pill"><b class="cls-blunder">${w.counts.blunder + b.counts.blunder}</b> зевков</span>
+      <span class="cls-pill"><b class="cls-mistake">${w.counts.mistake + b.counts.mistake}</b> ошибок</span>
+      <span class="cls-pill"><b class="cls-inaccuracy">${w.counts.inaccuracy + b.counts.inaccuracy}</b> неточностей</span>
+      <span class="cls-pill"><b class="cls-brilliant">${w.counts.brilliant + b.counts.brilliant}</b> блестящих</span>
     </div>
   `;
   renderPlayers();
