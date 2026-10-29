@@ -42,7 +42,6 @@ export class EvalGraph {
     const plotW = w - padX * 2, plotH = h - padY * 2;
     const midY = padY + plotH / 2;
 
-    // Фон
     ctx.fillStyle = 'rgba(255,255,255,0.02)';
     ctx.fillRect(padX, padY, plotW, plotH);
 
@@ -54,7 +53,6 @@ export class EvalGraph {
       return padY + plotH * (1 - (c + CONFIG.EVAL_CLAMP * 100) / (CONFIG.EVAL_CLAMP * 200));
     };
 
-    // Градиент
     const grad = ctx.createLinearGradient(0, padY, 0, padY + plotH);
     grad.addColorStop(0, 'rgba(143, 191, 90, 0.3)');
     grad.addColorStop(0.5, 'rgba(143, 191, 90, 0)');
@@ -66,7 +64,6 @@ export class EvalGraph {
     ctx.lineTo(getX(this.points.length - 1), padY + plotH);
     ctx.fillStyle = grad; ctx.fill();
 
-    // Линия
     ctx.beginPath();
     ctx.strokeStyle = '#d7e2ee'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
     for (let i = 0; i < this.points.length; i++) {
@@ -75,11 +72,9 @@ export class EvalGraph {
     }
     ctx.stroke();
 
-    // Текущая позиция
     const cx = getX(this.current), cy = getY(this.points[this.current]?.cp);
     ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fillStyle = '#a6d46e'; ctx.fill();
 
-    // Ховер
     if (this.hoverIndex !== null) {
       const hx = getX(this.hoverIndex);
       ctx.beginPath(); ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1;

@@ -11,7 +11,7 @@ const $ = (s) => document.querySelector(s);
 
 const state = {
   game: null, moves: [], analysis: null, ply: 0, orientation: 'w',
-  depth: 3, busy: false, runId: 0, searchAbort: null
+  depth: 12, busy: false, runId: 0, searchAbort: null
 };
 
 const settings = new Settings();
@@ -30,7 +30,7 @@ function init() {
   });
   
   initCustomSelect('themeCustomSelect', settings.get('boardTheme') || 'green', (val) => {
-    // Значение сохранится при нажатии кнопки "Сохранить"
+    // Сохранится при клике на "Сохранить"
   });
 
   bindEvents();
@@ -39,7 +39,6 @@ function init() {
   setEngineState('idle');
 }
 
-// Инициализация кастомных селектов
 function initCustomSelect(id, defaultVal, onChange) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -62,7 +61,6 @@ function initCustomSelect(id, defaultVal, onChange) {
       if (onChange) onChange(val);
     });
     
-    // Установка дефолтного значения
     if (String(opt.dataset.value) === String(defaultVal)) {
       opt.classList.add('selected');
       trigger.textContent = opt.textContent;
@@ -70,7 +68,6 @@ function initCustomSelect(id, defaultVal, onChange) {
   });
 }
 
-// Закрытие селектов по клику вне
 document.addEventListener('click', () => {
   document.querySelectorAll('.custom-select').forEach(s => s.classList.remove('open'));
 });
@@ -97,7 +94,6 @@ function bindEvents() {
   $('#pgnAnalyzeBtn').addEventListener('click', analyzePgnFromModal);
 
   $('#settingsBtn').addEventListener('click', () => {
-    // Синхронизируем чекбоксы и селект с настройками
     $('#themeCustomSelect .select-options').querySelectorAll('.select-option').forEach(o => {
       const isSel = o.dataset.value === (settings.get('boardTheme') || 'green');
       o.classList.toggle('selected', isSel);
@@ -147,7 +143,6 @@ function bindEvents() {
   });
 }
 
-// ================= ЛОГИКА ЗАГРУЗКИ =================
 async function loadChesscomGames(username) {
   if (!username.trim()) return setGamesState('Введите ник', 'error');
   if (state.searchAbort) state.searchAbort.abort();
@@ -235,7 +230,6 @@ function analyzePgnFromModal() {
   }
 }
 
-// ================= ИГРА =================
 function loadGame(parsed, meta, orientation) {
   cancelAnalysis(true);
   state.game = { ...parsed, meta };
@@ -262,7 +256,6 @@ function leaveAnalysis() {
   $('#homeView').classList.remove('hidden');
 }
 
-// ================= АНАЛИЗ =================
 async function startAnalysis(isManual) {
   if (!state.game || state.busy) return;
   const runId = ++state.runId;
@@ -311,7 +304,6 @@ function cancelAnalysis(silent) {
   state.runId++;
   state.busy = false;
   
-  // Защита от краша, если в старом движке нет метода stop
   if (engine && typeof engine.stop === 'function') {
     engine.stop();
   }
@@ -335,7 +327,6 @@ function setEngineState(s) {
   $('#enginePillText').textContent = 'Движок · ' + ({ loading: 'загрузка', ready: 'готов', error: 'ошибка', idle: 'ожидание' }[s] || s);
 }
 
-// ================= НАВИГАЦИЯ =================
 function goToPly(ply) {
   if (!state.game) return;
   state.ply = Math.max(0, Math.min(state.moves.length, ply));
@@ -357,7 +348,6 @@ function highlightMove() {
   $('#moveList').querySelectorAll('[data-ply]').forEach(b => b.classList.toggle('active', +b.dataset.ply === state.ply));
 }
 
-// ================= РЕНДЕР =================
 function renderGameMeta() {
   const m = state.game.meta;
   $('#gameMeta').innerHTML = `

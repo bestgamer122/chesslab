@@ -1,6 +1,5 @@
 const DEFAULT_SETTINGS = {
   boardTheme: 'green',
-  pieceStyle: 'classic',
   showCoords: true,
   animations: true,
 };

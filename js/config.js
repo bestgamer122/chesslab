@@ -1,19 +1,4 @@
-/**
- * Настройки приложения.
- */
 export const CONFIG = {
-  // Список прямых зеркал
-  ENGINE_URLS: [
-    'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js',
-    'https://unpkg.com/stockfish.js@10.0.2/stockfish.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js'
-  ],
-  // Прокси-серверы для обхода блокировок провайдера
-  CORS_PROXIES: [
-    'https://corsproxy.io/?',
-    'https://api.allorigins.win/raw?url=',
-    'https://api.codetabs.com/v1/proxy?quest='
-  ],
   ENGINE_DEFAULT_DEPTH: 12,
   CHESSCOM_API: 'https://api.chess.com/pub',
   EVAL_CLAMP: 6

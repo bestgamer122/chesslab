@@ -2,7 +2,7 @@ import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dist/esm/ches
 
 const PIECES = {
   p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚',
-  P: '♙', N: '♘', B: '♗', R: '♖', Q: '♕', K: '♔'
+  P: '♟', N: '♞', B: '♝', R: '♜', Q: '♛', K: '♚'
 };
 
 export class BoardView {
@@ -25,8 +25,8 @@ export class BoardView {
       for (let f = 0; f < 8; f++) {
         const sq = document.createElement('div');
         sq.className = `square ${(r + f) % 2 === 0 ? 'light' : 'dark'}`;
+        sq.dataset.sq = 'abcdefgh'[f] + (8 - r);
         
-        // Координаты
         const fileLabel = document.createElement('span');
         fileLabel.className = 'coord file';
         fileLabel.textContent = 'abcdefgh'[f];
@@ -50,12 +50,18 @@ export class BoardView {
     this.el.querySelectorAll('.coord').forEach(c => c.style.display = showCoords ? '' : 'none');
   }
 
-  setPosition(fen, { from, to, best, animate = true } = {}) {
+  getSquareEl(sq) {
+    return this.el.querySelector(`.square[data-sq="${sq}"]`);
+  }
+
+  setPosition(fen, { from = null, to = null, best = null, animate = true } = {}) {
+    const isAnimated = animate && this.settings.get('animations');
+    const oldRect = (from && isAnimated) ? this.getSquareEl(from)?.getBoundingClientRect() : null;
+
     this.currentFen = fen;
     const chess = new Chess(fen);
     const board = chess.board();
     
-    // Отрисовка фигур
     let index = 0;
     for (let r = 0; r < 8; r++) {
       for (let f = 0; f < 8; f++) {
@@ -63,61 +69,58 @@ export class BoardView {
         const sq = this.squares[index];
         
         sq.classList.remove('last-move', 'check');
-        
-        // Очищаем старые фигуры
         const existing = sq.querySelector('.piece');
         if (existing) existing.remove();
         
-        // Добавляем новую
         if (piece) {
           const p = document.createElement('div');
           p.className = `piece ${piece.color}`;
+          p.dataset.sq = sq.dataset.sq;
           p.textContent = PIECES[piece.color === 'w' ? piece.type.toUpperCase() : piece.type];
-          
-          if (!animate || !this.settings.get('animations')) p.style.transition = 'none';
-          else p.style.transition = 'transform 0.2s ease-in-out';
-
           sq.appendChild(p);
         }
         index++;
       }
     }
 
-    // Подсветка
     if (from && to) {
       this.getSquareEl(from)?.classList.add('last-move');
       this.getSquareEl(to)?.classList.add('last-move');
     }
 
-    // Шах
     if (chess.inCheck()) {
       const turn = chess.turn();
-      // Находим короля
       for (let r = 0; r < 8; r++) {
         for (let f = 0; f < 8; f++) {
           const p = board[r][f];
           if (p && p.type === 'k' && p.color === turn) {
-            const sqName = 'abcdefgh'[f] + (8 - r);
-            this.getSquareEl(sqName)?.classList.add('check');
+            this.getSquareEl('abcdefgh'[f] + (8 - r))?.classList.add('check');
           }
         }
       }
     }
 
-    this.drawArrow(best);
-  }
+    // FLIP Анимация
+    if (from && to && isAnimated && oldRect) {
+      const newEl = this.el.querySelector(`.piece[data-sq="${to}"]`);
+      if (newEl) {
+        const newRect = this.getSquareEl(to)?.getBoundingClientRect();
+        if (newRect) {
+          const dx = oldRect.left - newRect.left;
+          const dy = oldRect.top - newRect.top;
+          
+          newEl.style.transition = 'none';
+          newEl.style.transform = `translate(${dx}px, ${dy}px)`;
+          
+          requestAnimationFrame(() => {
+            newEl.style.transition = 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)';
+            newEl.style.transform = 'translate(0, 0)';
+          });
+        }
+      }
+    }
 
-  getSquareEl(sq) {
-    const f = 'abcdefgh'.indexOf(sq[0]);
-    const r = 8 - parseInt(sq[1], 10);
-    if (f === -1 || isNaN(r)) return null;
-    
-    // Учитываем переворот доски
-    let index;
-    if (this.orientation === 'w') index = r * 8 + f;
-    else index = (7 - r) * 8 + (7 - f);
-    
-    return this.squares[index];
+    this.drawArrow(best);
   }
 
   drawArrow(best) {
@@ -132,14 +135,22 @@ export class BoardView {
     const sqTo = this.getSquareEl(to);
     if (!sqFrom || !sqTo) return;
 
-    const rectFrom = sqFrom.getBoundingClientRect();
-    const rectTo = sqTo.getBoundingClientRect();
     const rectBoard = this.el.getBoundingClientRect();
+    const cx = rectBoard.width / 2;
+    const cy = rectBoard.height / 2;
 
-    const x1 = (rectFrom.left - rectBoard.left) + rectFrom.width / 2;
-    const y1 = (rectFrom.top - rectBoard.top) + rectFrom.height / 2;
-    const x2 = (rectTo.left - rectBoard.left) + rectTo.width / 2;
-    const y2 = (rectTo.top - rectBoard.top) + rectTo.height / 2;
+    let x1 = (sqFrom.offsetLeft + sqFrom.offsetWidth / 2);
+    let y1 = (sqFrom.offsetTop + sqFrom.offsetHeight / 2);
+    let x2 = (sqTo.offsetLeft + sqTo.offsetWidth / 2);
+    let y2 = (sqTo.offsetTop + sqTo.offsetHeight / 2);
+
+    // Если доска перевернута, отражаем координаты относительно центра
+    if (this.orientation === 'b') {
+      x1 = cx - (x1 - cx);
+      y1 = cy - (y1 - cy);
+      x2 = cx - (x2 - cx);
+      y2 = cy - (y2 - cy);
+    }
 
     const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
     defs.innerHTML = `
@@ -155,7 +166,7 @@ export class BoardView {
     line.setAttribute('x2', x2);
     line.setAttribute('y2', y2);
     line.setAttribute('stroke', 'rgba(143, 191, 90, 0.8)');
-    line.setAttribute('stroke-width', rectFrom.width * 0.15);
+    line.setAttribute('stroke-width', sqFrom.offsetWidth * 0.15);
     line.setAttribute('marker-end', 'url(#arrowhead)');
     line.setAttribute('stroke-linecap', 'round');
     svg.appendChild(line);
@@ -167,5 +178,8 @@ export class BoardView {
     this.el.querySelectorAll('.piece').forEach(p => {
       p.style.transform = this.orientation === 'b' ? 'rotate(180deg)' : 'none';
     });
+    // Перерисовываем стрелку, если она была
+    const best = this.el.dataset.lastBest || null;
+    if (best) this.drawArrow(best);
   }
 }

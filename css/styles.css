@@ -170,7 +170,7 @@ main { padding: 0 clamp(20px, 5vw, 60px) 80px; }
 .feature-chips { display: flex; gap: 10px; margin-top: 30px; flex-wrap: wrap; }
 .chip-soft { padding: 8px 16px; border-radius: 99px; background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border); font-size: 13px; font-weight: 600; color: var(--text-soft); }
 
-/* Hero Art (Конь и фигуры) */
+/* Hero Art */
 .hero-art { position: relative; display: grid; place-items: center; min-height: 400px; }
 .hero-glow {
   position: absolute; width: 400px; height: 400px;
@@ -311,7 +311,7 @@ input:checked + .slider:before { transform: translateX(22px); }
 .toast.error { background: var(--danger); color: #fff; }
 
 /* ============================================================
-   КАСТОМНАЯ ДОСКА
+   КАСТОМНАЯ ДОСКА (FLIP-Анимации и сплошные фигуры)
    ============================================================ */
 .chessboard {
   width: 100%; aspect-ratio: 1 / 1; display: grid;
@@ -333,10 +333,20 @@ input:checked + .slider:before { transform: translateX(22px); }
 .piece {
   position: absolute; width: 100%; height: 100%;
   display: flex; justify-content: center; align-items: center;
-  z-index: 10; pointer-events: none; transition: transform 0.25s ease-in-out;
+  z-index: 10; pointer-events: none; will-change: transform;
 }
-.piece.w { color: #fff; text-shadow: 0 0 2px #000, 0 0 4px #000, 1px 1px 0 #000, -1px -1px 0 #000; }
-.piece.b { color: #222; text-shadow: 0 0 2px #fff, 0 0 4px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff; }
+
+/* СПЛОШНЫЕ ФИГУРЫ */
+.piece.w { 
+  color: #ffffff; 
+  -webkit-text-stroke: 2px #111111; 
+  text-shadow: 0 4px 6px rgba(0,0,0,0.4); 
+}
+.piece.b { 
+  color: #111111; 
+  -webkit-text-stroke: 1.5px #eeeeee; 
+  text-shadow: 0 4px 6px rgba(0,0,0,0.4); 
+}
 
 .chessboard .piece { font-family: "Segoe UI Symbol", "Arial Unicode MS", "Arial", sans-serif; }
 
