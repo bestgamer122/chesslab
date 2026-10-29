@@ -4,7 +4,6 @@ const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const abortError = () => { const e = new Error('AbortError'); e.name = 'AbortError'; return e; };
 
-// Lichess/Chess.com Win Probability
 export function winPercent(cp, mate) {
   if (mate !== null && mate !== undefined) return mate > 0 ? 100 : 0;
   const safe = clamp(cp || 0, -1500, 1500);
@@ -65,7 +64,6 @@ function isSacrifice(fen, square, mover) {
   } catch (_) { return false; }
 }
 
-// Lichess Accuracy Formula
 function accuracyFromLoss(loss) { 
   return clamp(103.1668 * Math.exp(-0.04354 * loss) - 3.1669, 0, 100); 
 }
@@ -95,7 +93,7 @@ export async function analyzeGame({ moves, startFen, engine, depth, onProgress, 
     
     const fen = positions[i], c = new Chess(fen);
     let ev;
-    if (c.isCheckmate()) ev = { cp: c.turn() === 'w' ? -20000 : 20000, mate: null, bestMove: null, pv: [] };
+    if (c.isCheckmate()) ev = { cp: -20000, mate: null, bestMove: null, pv: [] };
     else if (c.isDraw() || c.isStalemate()) ev = { cp: 0, mate: null, bestMove: null, pv: [] };
     else ev = await engine.evaluate(fen, { depth });
     
@@ -115,14 +113,24 @@ export async function analyzeGame({ moves, startFen, engine, depth, onProgress, 
     const mateA = aW.mate === null ? null : aW.mate * sign;
     const cpB = bW.cp * sign, cpA = aW.cp * sign;
 
-    const winB = winPercent(cpB, mateB), winA = winPercent(cpA, mateA);
-    const winLoss = clamp(winB - winA, 0, 100);
-    const cpLoss = mateB !== null || mateA !== null ? (winLoss > 0 ? 1000 : 0) : clamp(cpB - cpA, 0, 1000);
+    let winB = winPercent(cpB, mateB), winA = winPercent(cpA, mateA);
+    let winLoss = clamp(winB - winA, 0, 100);
+    let cpLoss = mateB !== null || mateA !== null ? (winLoss > 0 ? 1000 : 0) : clamp(cpB - cpA, 0, 1000);
 
     const playedUci = getUci(m), bestUci = before.bestMove;
     const isBest = bestUci === playedUci;
     const delivMate = /#/.test(m.san);
     const missedMate = !delivMate && mateB > 0 && !(mateA > 0) && winLoss >= 8;
+
+    // Сглаживание шума движка для точности (как на Chess.com)
+    if (delivMate) {
+      winLoss = 0;
+      cpLoss = 0;
+      winA = 100;
+    } else if (isBest && winLoss < 3) {
+      winLoss = 0;
+      cpLoss = Math.min(cpLoss, 10);
+    }
 
     const matDelta = calcMaterial(m.after, m.color) - calcMaterial(m.before, m.color);
     const sac = isSacrifice(m.after, m.to, m.color) || matDelta <= -1.9;

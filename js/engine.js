@@ -28,7 +28,6 @@ export class Engine {
       }, 15000);
 
       try {
-        // Скачиваем ядро и WASM с CDN в оперативную память
         const jsUrl = 'https://cdn.jsdelivr.net/npm/stockfish@16.0.0/src/stockfish-nnue-16-single.js';
         const wasmUrl = 'https://cdn.jsdelivr.net/npm/stockfish@16.0.0/src/stockfish-nnue-16-single.wasm';
 
@@ -145,14 +144,13 @@ export class Engine {
     return this.initPromise;
   }
 
-  evaluate(fen, { depth = 12 } = {}) {
+  evaluate(fen, { depth = 14 } = {}) {
     const run = () => new Promise((resolve, reject) => {
       if (!this.ready) return reject(new Error('Движок не готов'));
       
       const info = { cp: null, mate: null, depth: 0, pv: [] };
       let isResolved = false;
       
-      // Таймаут на позицию (10 сек), чтобы не зависнуть навсегда
       const timeout = setTimeout(() => {
         if (!isResolved) {
           this.worker.postMessage('stop');

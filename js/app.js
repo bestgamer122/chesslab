@@ -423,13 +423,16 @@ function renderSummary() {
     
     <div class="stats-table">
       <div class="stat-row header">
-        <span></span>
-        <span class="dot white"></span>
-        <span class="dot black"></span>
+        <span class="stat-label">Тип хода</span>
+        <span class="stat-player">Белые</span>
+        <span class="stat-player">Чёрные</span>
       </div>
       ${genStatRow('Блестящий', w.counts.brilliant, b.counts.brilliant, 'brilliant')}
       ${genStatRow('Замечательный', w.counts.great, b.counts.great, 'great')}
       ${genStatRow('Лучший', w.counts.best, b.counts.best, 'best')}
+      ${genStatRow('Отлично', w.counts.excellent, b.counts.excellent, 'excellent')}
+      ${genStatRow('Хорошо', w.counts.good, b.counts.good, 'good')}
+      ${genStatRow('Неточность', w.counts.inaccuracy, b.counts.inaccuracy, 'inaccuracy')}
       ${genStatRow('Ошибка', w.counts.mistake, b.counts.mistake, 'mistake')}
       ${genStatRow('Упущенный шанс', w.counts.miss, b.counts.miss, 'miss')}
       ${genStatRow('Зевок', w.counts.blunder, b.counts.blunder, 'blunder')}
@@ -463,15 +466,9 @@ function renderMoveInfo() {
   const cls = CLASSES[info.classification];
   const num = Math.floor((info.ply - 1) / 2) + 1;
   const moveStr = `${num}${info.color==='w'?'.':'...'} ${info.san}`;
-  const evalAfter = info.evalAfterWhite;
   
-  let evalText = '0.00';
-  if (evalAfter.mate !== null) {
-    evalText = (evalAfter.mate > 0 ? '+M' : '-M') + Math.abs(evalAfter.mate);
-  } else {
-    const v = (evalAfter.cp || 0) / 100;
-    evalText = (v > 0 ? '+' : '') + v.toFixed(2);
-  }
+  // Используем formatEval для красивого вывода оценки
+  const evalText = formatEval(info.evalAfterWhite);
 
   box.innerHTML = `
     <div class="mi-top">
