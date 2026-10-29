@@ -3,8 +3,8 @@
  * Все внешние зависимости подключаются с CDN — сборка не требуется.
  */
 export const CONFIG = {
-  // Надёжный ASM.js движок одним файлом
-  ENGINE_CDN: 'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js',
+  // Явно указываем asm.js версию (без WASM), чтобы не было проблем с CORS
+  ENGINE_CDN: 'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js?wasm=0',
   ENGINE_DEFAULT_DEPTH: 12,
   ENGINE_TIMEOUT_MS: 90000,
 

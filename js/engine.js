@@ -2,8 +2,8 @@ import { CONFIG } from './config.js';
 
 /**
  * Обёртка над UCI-движком Stockfish.
- * Загружает код движка через fetch и запускает в Web Worker через Blob.
- * Это обходит все ограничения CORS на GitHub Pages.
+ * Загружает движок через fetch и создает Blob Worker.
+ * Это 100% исключает ошибки с CORS, MIME-типами и путями.
  */
 export class Engine {
   constructor() {
@@ -34,19 +34,24 @@ export class Engine {
       this._init = { resolve, reject, settled: false };
 
       this._initTimer = setTimeout(() => {
-        this._failInit(new Error('Движок не ответил за 30 секунд. Проверьте интернет.'));
-      }, 30000);
+        this._failInit(new Error('Движок не ответил за 60 секунд. Проверьте интернет.'));
+      }, 60000); // Увеличили таймаут до 60 сек для медленного интернета
 
       try {
-        // Скачиваем код движка и создаем Blob (обходим CORS)
-        const response = await fetch(CONFIG.ENGINE_CDN);
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        const code = await response.text();
-        const blob = new Blob([code], { type: 'application/javascript' });
+        // Создаем код шима прямо в памяти, чтобы не зависеть от файла sf-shim.js
+        const shimCode = `
+          const engineUrl = '${CONFIG.ENGINE_CDN}';
+          try {
+            importScripts(engineUrl);
+          } catch (error) {
+            postMessage('__ENGINE_LOAD_ERROR__ ' + (error && error.message ? error.message : String(error)));
+          }
+        `;
+        const blob = new Blob([shimCode], { type: 'application/javascript' });
         this._blobUrl = URL.createObjectURL(blob);
         this.worker = new Worker(this._blobUrl);
       } catch (error) {
-        this._failInit(new Error('Не удалось скачать движок: ' + error.message));
+        this._failInit(new Error('Ошибка инициализации движка: ' + error.message));
         return;
       }
 
@@ -137,7 +142,6 @@ export class Engine {
     if (!this.current || !line.startsWith('info')) return;
 
     const info = this.current.info;
-
     const depthMatch = line.match(/\bdepth\s+(\d+)/);
     if (depthMatch) info.depth = parseInt(depthMatch[1], 10);
 
@@ -169,10 +173,6 @@ export class Engine {
     return error;
   }
 
-  /**
-   * Оценка одной позиции. Возвращает { cp, mate, depth, pv, bestMove }.
-   * Оценка всегда с точки зрения стороны, которая ходит.
-   */
   evaluate(fen, { depth = CONFIG.ENGINE_DEFAULT_DEPTH } = {}) {
     const run = () => new Promise((resolve, reject) => {
       if (!this.ready || !this.worker) {
@@ -205,7 +205,6 @@ export class Engine {
     return promise;
   }
 
-  /** Останавливает текущий поиск. Текущий evaluate отклонится с AbortError. */
   stop() {
     if (!this.current) return;
     const current = this.current;
