@@ -1,12 +1,10 @@
 /*
  * Классический Web Worker-шим для Stockfish.
- *
- * Мы не создаём Worker напрямую с CDN (кросс-доменный Worker запрещён),
- * а загружаем движок через importScripts в этом же домене.
- * URL движка передаётся параметром ?src=...
+ * Принудительно используем ASM.js версию (без WASM).
  */
 const params = new URL(self.location.href).searchParams;
-const engineUrl = params.get('src') || 'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js';
+// Явно указываем на ASM.js сборку
+const engineUrl = params.get('src') || 'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js?wasm=0';
 
 try {
   importScripts(engineUrl);
