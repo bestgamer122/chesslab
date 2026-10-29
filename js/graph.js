@@ -25,7 +25,6 @@ export class EvalGraph {
     this.points = points || []; 
     this.current = cur; 
     this.hoverIndex = null; 
-    // Принудительный сброс для перерисовки, если контейнер был скрыт
     this.canvas.width = 1; 
     this.canvas.width = Math.max(300, this.canvas.clientWidth) * (window.devicePixelRatio || 1);
     this._draw(); 
@@ -42,7 +41,7 @@ export class EvalGraph {
   _draw() {
     const dpr = window.devicePixelRatio || 1;
     const w = Math.max(300, this.canvas.clientWidth); 
-    const h = 170;
+    const h = this.canvas.clientHeight || 150;
     
     if (this.canvas.width !== w * dpr) {
       this.canvas.width = w * dpr; 
@@ -53,12 +52,18 @@ export class EvalGraph {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    const padX = 10, padY = 10;
+    const padX = 8, padY = 8;
     const plotW = w - padX * 2, plotH = h - padY * 2;
     const midY = padY + plotH / 2;
 
-    ctx.fillStyle = 'rgba(255,255,255,0.02)';
-    ctx.fillRect(padX, padY, plotW, plotH);
+    // Сетка
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)'; 
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padX, midY); ctx.lineTo(w - padX, midY);
+    ctx.moveTo(padX, padY + plotH * 0.25); ctx.lineTo(w - padX, padY + plotH * 0.25);
+    ctx.moveTo(padX, padY + plotH * 0.75); ctx.lineTo(w - padX, padY + plotH * 0.75);
+    ctx.stroke();
 
     if (!this.points.length) return;
 
@@ -68,32 +73,64 @@ export class EvalGraph {
       return padY + plotH * (1 - (c + CONFIG.EVAL_CLAMP * 100) / (CONFIG.EVAL_CLAMP * 200));
     };
 
+    // Градиентная заливка
     const grad = ctx.createLinearGradient(0, padY, 0, padY + plotH);
-    grad.addColorStop(0, 'rgba(143, 191, 90, 0.3)');
+    grad.addColorStop(0, 'rgba(143, 191, 90, 0.25)');
     grad.addColorStop(0.5, 'rgba(143, 191, 90, 0)');
-    grad.addColorStop(1, 'rgba(239, 107, 107, 0.3)');
+    grad.addColorStop(0.5, 'rgba(239, 107, 107, 0)');
+    grad.addColorStop(1, 'rgba(239, 107, 107, 0.25)');
 
     ctx.beginPath();
     ctx.moveTo(getX(0), padY + plotH);
-    for (let i = 0; i < this.points.length; i++) ctx.lineTo(getX(i), getY(this.points[i].cp));
+    
+    // Плавная линия (Кривые Безье)
+    for (let i = 1; i < this.points.length; i++) {
+      const x0 = getX(i - 1), y0 = getY(this.points[i - 1].cp);
+      const x1 = getX(i), y1 = getY(this.points[i].cp);
+      const cpX = (x0 + x1) / 2;
+      ctx.bezierCurveTo(cpX, y0, cpX, y1, x1, y1);
+    }
+    
+    // Закрываем заливку
     ctx.lineTo(getX(this.points.length - 1), padY + plotH);
-    ctx.fillStyle = grad; ctx.fill();
+    ctx.fillStyle = grad; 
+    ctx.fill();
 
+    // Сама линия
     ctx.beginPath();
-    ctx.strokeStyle = '#d7e2ee'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
-    for (let i = 0; i < this.points.length; i++) {
-      if (i === 0) ctx.moveTo(getX(i), getY(this.points[i].cp));
-      else ctx.lineTo(getX(i), getY(this.points[i].cp));
+    ctx.strokeStyle = '#e2e8f0'; 
+    ctx.lineWidth = 1.5; 
+    ctx.lineJoin = 'round';
+    
+    ctx.moveTo(getX(0), getY(this.points[0].cp));
+    for (let i = 1; i < this.points.length; i++) {
+      const x0 = getX(i - 1), y0 = getY(this.points[i - 1].cp);
+      const x1 = getX(i), y1 = getY(this.points[i].cp);
+      const cpX = (x0 + x1) / 2;
+      ctx.bezierCurveTo(cpX, y0, cpX, y1, x1, y1);
     }
     ctx.stroke();
 
+    // Текущий ход (Светящаяся точка)
     const cx = getX(this.current), cy = getY(this.points[this.current]?.cp);
-    ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fillStyle = '#a6d46e'; ctx.fill();
+    ctx.beginPath(); 
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2); 
+    ctx.fillStyle = '#a6d46e'; 
+    ctx.fill();
+    ctx.shadowColor = '#a6d46e';
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
 
+    // Ховер
     if (this.hoverIndex !== null) {
       const hx = getX(this.hoverIndex);
-      ctx.beginPath(); ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1;
-      ctx.moveTo(hx, padY); ctx.lineTo(hx, padY + plotH); ctx.stroke();
+      ctx.beginPath(); 
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)'; 
+      ctx.lineWidth = 1;
+      ctx.moveTo(hx, padY); 
+      ctx.lineTo(hx, padY + plotH); 
+      ctx.stroke();
     }
   }
 }

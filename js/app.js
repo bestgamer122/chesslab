@@ -347,7 +347,12 @@ function goToPly(ply) {
 }
 
 function highlightMove() {
-  $('#moveList').querySelectorAll('[data-ply]').forEach(b => b.classList.toggle('active', +b.dataset.ply === state.ply));
+  const list = $('#moveList');
+  list.querySelectorAll('[data-ply]').forEach(b => b.classList.toggle('active', +b.dataset.ply === state.ply));
+  
+  // Авто-скролл к активному ходу
+  const active = list.querySelector('.active');
+  if (active) active.scrollIntoView({ block: 'nearest' });
 }
 
 function renderGameMeta() {
@@ -407,7 +412,6 @@ function renderSummary() {
   const w = state.analysis.summary.w, b = state.analysis.summary.b;
   
   p.innerHTML = `
-    <div class="panel-head"><h2>Точность</h2></div>
     <div class="acc-grid">
       <div class="acc-card">
         <div class="acc-top"><span class="dot white"></span>Белые<span class="acc-num">${w.accuracy.toFixed(1)}%</span></div>
@@ -430,9 +434,6 @@ function renderSummary() {
       ${genStatRow('Блестящий', w.counts.brilliant, b.counts.brilliant, 'brilliant')}
       ${genStatRow('Замечательный', w.counts.great, b.counts.great, 'great')}
       ${genStatRow('Лучший', w.counts.best, b.counts.best, 'best')}
-      ${genStatRow('Отлично', w.counts.excellent, b.counts.excellent, 'excellent')}
-      ${genStatRow('Хорошо', w.counts.good, b.counts.good, 'good')}
-      ${genStatRow('Неточность', w.counts.inaccuracy, b.counts.inaccuracy, 'inaccuracy')}
       ${genStatRow('Ошибка', w.counts.mistake, b.counts.mistake, 'mistake')}
       ${genStatRow('Упущенный шанс', w.counts.miss, b.counts.miss, 'miss')}
       ${genStatRow('Зевок', w.counts.blunder, b.counts.blunder, 'blunder')}
@@ -454,7 +455,7 @@ function genStatRow(label, wCount, bCount, cls) {
 function renderMoveInfo() {
   const box = $('#moveInfo');
   if (!state.game || !state.analysis) {
-    box.innerHTML = '<div class="mi-empty">Выберите ход в списке, чтобы увидеть разбор</div>';
+    box.innerHTML = '<div class="mi-empty">Выберите ход в списке</div>';
     return;
   }
   if (state.ply === 0) {
@@ -465,7 +466,6 @@ function renderMoveInfo() {
   const info = state.analysis.moves[state.ply - 1];
   const cls = CLASSES[info.classification];
   const num = Math.floor((info.ply - 1) / 2) + 1;
-  const moveStr = `${num}${info.color==='w'?'.':'...'} ${info.san}`;
   const evalText = formatEval(info.evalAfterWhite);
 
   box.innerHTML = `
@@ -476,18 +476,12 @@ function renderMoveInfo() {
       </div>
       <div class="mi-eval-box">${evalText}</div>
     </div>
-    <div class="mi-middle">
-      <div class="mi-played">
-        <span class="mi-number">${num}${info.color === 'w' ? '.' : '...'}</span>
-        <span class="mi-san">${info.san}</span>
-      </div>
-      <div class="mi-best-move">
-        ${info.isBest ? 'Лучший ход по мнению движка' : `Лучше было: <span class="best-san">${info.bestSan || '—'}</span>`}
-      </div>
+    <div class="mi-played">
+      <div><span class="mi-number">${num}${info.color === 'w' ? '.' : '...'}</span>${info.san}</div>
+      <div class="mi-accuracy">Точность: <span>${info.accuracy.toFixed(0)}%</span></div>
     </div>
-    <div class="mi-bottom">
-      <span>Точность хода:</span>
-      <strong>${info.accuracy.toFixed(0)}%</strong>
+    <div class="mi-best-move">
+      ${info.isBest ? 'Лучший ход по мнению движка' : `Лучше было: <span class="best-san">${info.bestSan || '—'}</span>`}
     </div>
   `;
 }
