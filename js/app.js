@@ -29,9 +29,7 @@ function init() {
     settings.save({ depth: state.depth });
   });
   
-  initCustomSelect('themeCustomSelect', settings.get('boardTheme') || 'green', (val) => {
-    // Сохранится при клике на "Сохранить"
-  });
+  initCustomSelect('themeCustomSelect', settings.get('boardTheme') || 'green', () => {});
 
   bindEvents();
   renderSummary();
@@ -258,6 +256,10 @@ function leaveAnalysis() {
 
 async function startAnalysis(isManual) {
   if (!state.game || state.busy) return;
+  
+  // Сброс предыдущего движка перед новым анализом
+  if (engine) engine.stop();
+  
   const runId = ++state.runId;
   state.busy = true;
   state.analysis = null;
@@ -399,20 +401,23 @@ function genMoveBtn(idx, info) {
 function renderSummary() {
   const p = $('#summaryPanel');
   if (!state.analysis) {
-    p.innerHTML = `<div class="panel-head"><h2>Точность</h2></div><div class="muted small" style="text-align:center;padding:20px 0">Данные появятся после анализа</div>`;
+    p.innerHTML = `<div class="panel-head"><h2>Точность</h2></div><div class="mi-empty">Данные появятся после анализа</div>`;
     return;
   }
   const w = state.analysis.summary.w, b = state.analysis.summary.b;
   p.innerHTML = `
     <div class="panel-head"><h2>Точность</h2></div>
     <div class="acc-grid">
-      <div class="acc-card"><div class="acc-top"><span class="dot white"></span>Белые<span class="acc-num">${w.accuracy.toFixed(1)}%</span></div><div class="acc-track"><span style="width:${w.accuracy}%"></span></div><div class="small muted">ACPL ${w.acpl} · зевков ${w.counts.blunder}</div></div>
-      <div class="acc-card"><div class="acc-top"><span class="dot black"></span>Чёрные<span class="acc-num">${b.accuracy.toFixed(1)}%</span></div><div class="acc-track"><span style="width:${b.accuracy}%; background:#8fa3bd"></span></div><div class="small muted">ACPL ${b.acpl} · зевков ${b.counts.blunder}</div></div>
-    </div>
-    <div class="cls-row">
-      <span class="cls-pill"><b class="cls-blunder">${w.counts.blunder + b.counts.blunder}</b> зевков</span>
-      <span class="cls-pill"><b class="cls-mistake">${w.counts.mistake + b.counts.mistake}</b> ошибок</span>
-      <span class="cls-pill"><b class="cls-brilliant">${w.counts.brilliant + b.counts.brilliant}</b> блестящих</span>
+      <div class="acc-card">
+        <div class="acc-top"><span class="dot white"></span>Белые<span class="acc-num">${w.accuracy.toFixed(1)}%</span></div>
+        <div class="acc-track"><span style="width:${w.accuracy}%; background: var(--accent)"></span></div>
+        <div class="acc-sub">ACPL ${w.acpl} · зевков ${w.counts.blunder}</div>
+      </div>
+      <div class="acc-card">
+        <div class="acc-top"><span class="dot black"></span>Чёрные<span class="acc-num">${b.accuracy.toFixed(1)}%</span></div>
+        <div class="acc-track"><span style="width:${b.accuracy}%; background: #8fa3bd"></span></div>
+        <div class="acc-sub">ACPL ${b.acpl} · зевков ${b.counts.blunder}</div>
+      </div>
     </div>
   `;
   renderPlayers();
@@ -421,11 +426,11 @@ function renderSummary() {
 function renderMoveInfo() {
   const box = $('#moveInfo');
   if (!state.game || !state.analysis) {
-    box.innerHTML = '<div class="muted small" style="text-align:center;padding:20px 0">Выберите ход</div>';
+    box.innerHTML = '<div class="mi-empty">Выберите ход в списке, чтобы увидеть разбор</div>';
     return;
   }
   if (state.ply === 0) {
-    box.innerHTML = '<div class="mi-move">Стартовая позиция</div>';
+    box.innerHTML = '<div class="mi-empty">Стартовая позиция</div>';
     return;
   }
 
@@ -433,16 +438,37 @@ function renderMoveInfo() {
   const cls = CLASSES[info.classification];
   const num = Math.floor((info.ply - 1) / 2) + 1;
   const moveStr = `${num}${info.color==='w'?'.':'...'} ${info.san}`;
+  const evalAfter = info.evalAfterWhite;
+  
+  let evalText = '0.00';
+  if (evalAfter.mate !== null) {
+    evalText = (evalAfter.mate > 0 ? '+M' : '-M') + Math.abs(evalAfter.mate);
+  } else {
+    const v = (evalAfter.cp || 0) / 100;
+    evalText = (v > 0 ? '+' : '') + v.toFixed(2);
+  }
 
   box.innerHTML = `
-    <div class="mi-head">
-      <span class="chip cls-${info.classification}" style="border:1px solid ${cls.color}40; color:${cls.color}">${cls.short} ${cls.label}</span>
-      <span class="small muted">${formatEval(info.evalBeforeWhite)} → ${formatEval(info.evalAfterWhite)}</span>
+    <div class="mi-top">
+      <div class="mi-class ${info.classification}">
+        <span class="mi-symbol">${cls.short}</span>
+        <span class="mi-label">${cls.label}</span>
+      </div>
+      <div class="mi-eval-box">${evalText}</div>
     </div>
-    <div class="mi-move">${moveStr}</div>
-    <div class="small">${info.isBest ? 'Лучший ход по мнению движка' : `Лучше было: <b style="color:var(--accent)">${info.bestSan || '—'}</b>`}</div>
-    ${info.pvSan?.length ? `<div class="small muted" style="margin-top:6px">${info.pvSan.join(' ')}</div>` : ''}
-    <div class="mi-stats">Точность хода: ${info.accuracy.toFixed(0)}%</div>
+    <div class="mi-middle">
+      <div class="mi-played">
+        <span class="mi-number">${num}${info.color === 'w' ? '.' : '...'}</span>
+        <span class="mi-san">${info.san}</span>
+      </div>
+      <div class="mi-best-move">
+        ${info.isBest ? 'Лучший ход по мнению движка' : `Лучше было: <span class="best-san">${info.bestSan || '—'}</span>`}
+      </div>
+    </div>
+    <div class="mi-bottom">
+      <span>Точность хода:</span>
+      <strong>${info.accuracy.toFixed(0)}%</strong>
+    </div>
   `;
 }
 
