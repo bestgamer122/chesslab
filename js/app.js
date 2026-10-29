@@ -423,9 +423,9 @@ function renderSummary() {
     
     <div class="stats-table">
       <div class="stat-row header">
-        <span class="stat-label">Тип хода</span>
-        <span class="stat-player">Белые</span>
-        <span class="stat-player">Чёрные</span>
+        <span class="stat-name">Тип хода</span>
+        <span class="stat-col">Белые</span>
+        <span class="stat-col">Чёрные</span>
       </div>
       ${genStatRow('Блестящий', w.counts.brilliant, b.counts.brilliant, 'brilliant')}
       ${genStatRow('Замечательный', w.counts.great, b.counts.great, 'great')}
@@ -466,8 +466,6 @@ function renderMoveInfo() {
   const cls = CLASSES[info.classification];
   const num = Math.floor((info.ply - 1) / 2) + 1;
   const moveStr = `${num}${info.color==='w'?'.':'...'} ${info.san}`;
-  
-  // Используем formatEval для красивого вывода оценки
   const evalText = formatEval(info.evalAfterWhite);
 
   box.innerHTML = `
