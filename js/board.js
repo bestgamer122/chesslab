@@ -1,7 +1,7 @@
 import {
-  Chessboard, FEN, COLOR, MARKER_TYPE, BORDER_TYPE,
+  Chessboard, FEN, COLOR, BORDER_TYPE,
 } from 'https://cdn.jsdelivr.net/npm/cm-chessboard@8.12.3/src/Chessboard.js';
-import { Markers } from 'https://cdn.jsdelivr.net/npm/cm-chessboard@8.12.3/src/extensions/markers/Markers.js';
+import { Markers, MARKER_TYPE } from 'https://cdn.jsdelivr.net/npm/cm-chessboard@8.12.3/src/extensions/markers/Markers.js';
 import { Arrows, ARROW_TYPE } from 'https://cdn.jsdelivr.net/npm/cm-chessboard@8.12.3/src/extensions/arrows/Arrows.js';
 
 const ASSETS = 'https://cdn.jsdelivr.net/npm/cm-chessboard@8.12.3/assets/';
