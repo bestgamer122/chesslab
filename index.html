@@ -48,9 +48,25 @@
           <span class="chip-soft">Без интернета</span>
         </div>
       </div>
-      <div class="hero-art" aria-hidden="true">
-        <div class="hero-glow"></div>
-        <div class="hero-knight">♞</div>
+      <div class="hero-art">
+        <div class="mock-dashboard glass-panel">
+          <div class="mock-header">
+            <span class="mock-dot"></span>
+            <span class="mock-text">Hikaru (3100) vs Magnus (3200)</span>
+            <span class="mock-badge">+2.4</span>
+          </div>
+          <div class="mock-graph">
+            <svg viewBox="0 0 300 80" preserveAspectRatio="none">
+              <path d="M0,60 L40,50 L80,55 L120,40 L160,20 L200,25 L240,10 L300,5" fill="none" stroke="#8fbf5a" stroke-width="3" stroke-linecap="round"/>
+              <path d="M0,60 L40,50 L80,55 L120,40 L160,20 L200,25 L240,10 L300,5 L300,80 L0,80 Z" fill="rgba(143,191,90,0.1)"/>
+            </svg>
+          </div>
+          <div class="mock-stats">
+            <div class="mock-stat"><span>Точность</span><strong style="color:#8fbf5a">94.2%</strong></div>
+            <div class="mock-stat"><span>Зевки</span><strong>0</strong></div>
+            <div class="mock-stat"><span>Блестящие</span><strong style="color:#2dd4bf">2</strong></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -96,7 +112,6 @@
           <select id="depthSelect">
             <option value="2">2 (быстро)</option>
             <option value="3" selected>3 (стандарт)</option>
-            <option value="4">4 (глубоко)</option>
           </select>
         </label>
         <button class="btn btn-primary" id="reanalyzeBtn" type="button">Анализировать</button>
@@ -229,6 +244,6 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<script type="module" src="js/app.js?v=6"></script>
+<script type="module" src="js/app.js?v=7"></script>
 </body>
 </html>

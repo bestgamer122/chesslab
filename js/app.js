@@ -9,10 +9,9 @@ import { EvalGraph } from './graph.js';
 
 const $ = (s) => document.querySelector(s);
 
-// Глобальное состояние
 const state = {
   game: null, moves: [], analysis: null, ply: 0, orientation: 'w',
-  depth: CONFIG.ENGINE_DEFAULT_DEPTH, busy: false, runId: 0, searchAbort: null
+  depth: 3, busy: false, runId: 0, searchAbort: null
 };
 
 const settings = new Settings();
@@ -21,31 +20,27 @@ let board, graph, engine, toastTimer;
 init();
 
 function init() {
-  // Инициализация компонентов
   board = new BoardView($('#board'), settings);
   graph = new EvalGraph($('#evalGraph'), (ply) => goToPly(ply));
   engine = new Engine();
 
-  bindEvents();
   applySettingsToUI();
+  bindEvents();
   renderSummary();
   renderMoveInfo();
   setEngineState('idle');
 }
 
 function bindEvents() {
-  // Навигация
   $('#brandLink').addEventListener('click', (e) => { e.preventDefault(); leaveAnalysis(); });
   $('#newGameBtn').addEventListener('click', leaveAnalysis);
   $('#backBtn').addEventListener('click', leaveAnalysis);
 
-  // Поиск Chess.com
   $('#chesscomForm').addEventListener('submit', (e) => {
     e.preventDefault();
     loadChesscomGames($('#usernameInput').value);
   });
 
-  // PGN Dropzone
   $('#dropZone').addEventListener('click', () => $('#fileInput').click());
   $('#fileInput').addEventListener('change', (e) => {
     if (e.target.files && e.target.files[0]) readPgnFile(e.target.files[0]);
@@ -59,32 +54,33 @@ function bindEvents() {
   $('#pgnAnalyzeBtn').addEventListener('click', analyzePgnFromModal);
 
   $('#settingsBtn').addEventListener('click', () => {
-    $('#boardThemeSelect').value = settings.get('boardTheme');
-    $('#pieceStyleSelect').value = settings.get('pieceStyle');
-    $('#showCoordsCheckbox').checked = settings.get('showCoords');
-    $('#animationsCheckbox').checked = settings.get('animations');
+    $('#boardThemeSelect').value = settings.get('boardTheme') || 'green';
+    $('#showCoordsCheckbox').checked = settings.get('showCoords') !== false;
+    $('#animationsCheckbox').checked = settings.get('animations') !== false;
     $('#settingsModal').classList.remove('hidden');
   });
   $('#settingsCloseBtn').addEventListener('click', () => $('#settingsModal').classList.add('hidden'));
   $('#settingsSaveBtn').addEventListener('click', () => {
     settings.save({
       boardTheme: $('#boardThemeSelect').value,
-      pieceStyle: $('#pieceStyleSelect').value,
       showCoords: $('#showCoordsCheckbox').checked,
       animations: $('#animationsCheckbox').checked,
     });
     board.updateStyles();
-    board.setPosition(board.currentFen, { animate: false }); // Перерисовка
+    board.setPosition(board.currentFen, { animate: false });
     $('#settingsModal').classList.add('hidden');
     toast('Настройки сохранены');
   });
 
-  // Управление анализом
+  // Анализ
   $('#reanalyzeBtn').addEventListener('click', () => startAnalysis(true));
   $('#cancelBtn').addEventListener('click', cancelAnalysis);
-  $('#depthSelect').addEventListener('change', (e) => { state.depth = parseInt(e.target.value, 10); });
+  $('#depthSelect').addEventListener('change', (e) => {
+    state.depth = parseInt(e.target.value, 10);
+    settings.save({ depth: state.depth });
+  });
 
-  // Навигация по ходам
+  // Навигация
   $('#firstBtn').addEventListener('click', () => goToPly(0));
   $('#prevBtn').addEventListener('click', () => goToPly(state.ply - 1));
   $('#nextBtn').addEventListener('click', () => goToPly(state.ply + 1));
@@ -96,7 +92,6 @@ function bindEvents() {
     if (btn) goToPly(parseInt(btn.dataset.ply, 10));
   });
 
-  // Клавиатура
   document.addEventListener('keydown', (e) => {
     if (e.target.matches('input, textarea, select')) return;
     if (!$('#analysisView').classList.contains('hidden') && state.game) {
@@ -109,11 +104,19 @@ function bindEvents() {
 }
 
 function applySettingsToUI() {
-  $('#depthSelect').value = settings.get('depth') || 12;
+  const savedDepth = settings.get('depth');
+  const select = $('#depthSelect');
+  // Если сохраненная глубина есть в опциях, ставим её, иначе дефолт
+  if (savedDepth && Array.from(select.options).some(o => o.value == savedDepth)) {
+    select.value = savedDepth;
+    state.depth = parseInt(savedDepth, 10);
+  } else {
+    select.value = '3';
+    state.depth = 3;
+  }
 }
 
-// ================= ЗАГРУЗКА ПАРТИЙ =================
-
+// ================= ЛОГИКА ЗАГРУЗКИ =================
 async function loadChesscomGames(username) {
   if (!username.trim()) return setGamesState('Введите ник', 'error');
   if (state.searchAbort) state.searchAbort.abort();
@@ -201,8 +204,7 @@ function analyzePgnFromModal() {
   }
 }
 
-// ================= ОТКРЫТИЕ ПАРТИИ =================
-
+// ================= ИГРА =================
 function loadGame(parsed, meta, orientation) {
   cancelAnalysis(true);
   state.game = { ...parsed, meta };
@@ -230,7 +232,6 @@ function leaveAnalysis() {
 }
 
 // ================= АНАЛИЗ =================
-
 async function startAnalysis(isManual) {
   if (!state.game || state.busy) return;
   const runId = ++state.runId;
@@ -295,11 +296,10 @@ function setProgress(frac, label) {
 function setEngineState(s) {
   const p = $('#enginePill');
   p.className = 'engine-pill ' + (s === 'loading' ? 'is-loading' : s === 'ready' ? 'is-ready' : s === 'error' ? 'is-error' : '');
-  $('#enginePillText').textContent = 'Stockfish · ' + ({ loading: 'загрузка', ready: 'готов', error: 'ошибка', idle: 'ожидание' }[s] || s);
+  $('#enginePillText').textContent = 'Движок · ' + ({ loading: 'загрузка', ready: 'готов', error: 'ошибка', idle: 'ожидание' }[s] || s);
 }
 
 // ================= НАВИГАЦИЯ =================
-
 function goToPly(ply) {
   if (!state.game) return;
   state.ply = Math.max(0, Math.min(state.moves.length, ply));
@@ -322,7 +322,6 @@ function highlightMove() {
 }
 
 // ================= РЕНДЕР =================
-
 function renderGameMeta() {
   const m = state.game.meta;
   $('#gameMeta').innerHTML = `
