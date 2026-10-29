@@ -1,5 +1,9 @@
 import { CONFIG } from './config.js';
 
+/**
+ * Обёртка над UCI-движком Stockfish.
+ * Использует локальный worker.js и перебирает зеркала CDN в случае блокировки.
+ */
 export class Engine {
   constructor() {
     this.worker = null;
@@ -9,7 +13,8 @@ export class Engine {
     this.queue = Promise.resolve();
     this.onStatus = null;
     this._init = null;
-    this._blobUrl = null;
+    this._initTimer = null;
+    this._cdnIndex = 0;
   }
 
   async init(onStatus = () => {}) {
@@ -19,50 +24,55 @@ export class Engine {
     this.onStatus = onStatus;
     onStatus('loading');
 
-    this.initPromise = new Promise(async (resolve, reject) => {
+    this.initPromise = new Promise((resolve, reject) => {
       this._init = { resolve, reject, settled: false };
-
-      // Пытаемся скачать движок с разных CDN
-      let engineCode = null;
-      for (const url of CONFIG.ENGINE_URLS) {
-        try {
-          const res = await fetch(url);
-          if (res.ok) {
-            engineCode = await res.text();
-            break;
-          }
-        } catch (_) { /* пробуем следующий */ }
-      }
-
-      if (!engineCode) {
-        return this._failInit(new Error('Не удалось скачать движок ни с одного сервера.'));
-      }
-
-      // Запускаем из памяти (Blob) — 100% защита от CORS
-      const shimCode = `
-        const engineCode = ${JSON.stringify(engineCode)};
-        const blob = new Blob([engineCode], {type: 'application/javascript'});
-        importScripts(URL.createObjectURL(blob));
-      `;
-      try {
-        this._blobUrl = URL.createObjectURL(new Blob([shimCode], { type: 'application/javascript' }));
-        this.worker = new Worker(this._blobUrl);
-      } catch (err) {
-        return this._failInit(new Error('Ошибка Web Worker: ' + err.message));
-      }
-
-      this.worker.onerror = (e) => this._failInit(new Error('Ошибка движка: ' + e.message));
-      this.worker.onmessage = (e) => this._handleLine(String(e.data || ''));
-
-      // Таймаут инициализации
-      setTimeout(() => {
-        if (!this.ready) this._failInit(new Error('Движок не ответил. Возможно, заблокирован провайдером.'));
-      }, 60000);
-
-      this._send('uci');
+      this._tryLoadEngine();
     });
 
     return this.initPromise;
+  }
+
+  _tryLoadEngine() {
+    if (this._init?.settled) return;
+    
+    // Если все зеркала перебраны и не сработали
+    if (this._cdnIndex >= CONFIG.ENGINE_URLS.length) {
+      return this._failInit(new Error('Движок заблокирован провайдером на всех доступных серверах.'));
+    }
+
+    const url = CONFIG.ENGINE_URLS[this._cdnIndex];
+    try { this.worker && this.worker.terminate(); } catch (_) {}
+    try { clearTimeout(this._initTimer); } catch (_) {}
+
+    try {
+      this.worker = new Worker('js/engine/worker.js?url=' + encodeURIComponent(url));
+    } catch (e) {
+      this._cdnIndex++;
+      return this._tryLoadEngine();
+    }
+
+    // Если воркер выдал ошибку сети или 404
+    this.worker.onerror = () => {
+      this._cdnIndex++;
+      this._tryLoadEngine();
+    };
+
+    this.worker.onmessage = (e) => {
+      const line = String(e.data || '');
+      if (line.startsWith('__ERROR__')) {
+        this._cdnIndex++;
+        return this._tryLoadEngine(); // Пробуем следующий CDN
+      }
+      this._handleLine(line);
+    };
+
+    // Если за 8 секунд сервер не ответил, переключаемся на резервный
+    this._initTimer = setTimeout(() => {
+      this._cdnIndex++;
+      this._tryLoadEngine();
+    }, 8000);
+
+    this._send('uci');
   }
 
   _failInit(error) {
@@ -74,6 +84,7 @@ export class Engine {
     this.worker = null;
     if (this.onStatus) this.onStatus('error');
     this._init.reject(error);
+    this._init = null;
   }
 
   _handleLine(line) {
@@ -88,6 +99,7 @@ export class Engine {
     if (line === 'readyok') {
       if (!this.ready) {
         this.ready = true;
+        clearTimeout(this._initTimer);
         if (this._init) {
           this._init.settled = true;
           this._init.resolve();
@@ -137,10 +149,8 @@ export class Engine {
   evaluate(fen, { depth = CONFIG.ENGINE_DEFAULT_DEPTH } = {}) {
     const run = () => new Promise((resolve, reject) => {
       if (!this.ready) return reject(new Error('Движок не готов'));
-      
       const info = { cp: null, mate: null, depth: 0, pv: [] };
       this.current = { info, resolve, reject, cancelled: false };
-
       this._send('position fen ' + fen);
       this._send('go depth ' + depth);
     });

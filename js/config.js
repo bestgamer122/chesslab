@@ -2,14 +2,13 @@
  * Настройки приложения.
  */
 export const CONFIG = {
-  // Используем асм.жс версию (без WASM), чтобы обойти CORS
+  // Список зеркал для загрузки движка (если один заблокирован, сработает другой)
   ENGINE_URLS: [
-    'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js?wasm=0',
-    'https://unpkg.com/stockfish.js@10.0.2/stockfish.js?wasm=0',
-    'https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js?wasm=0'
+    'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js',
+    'https://unpkg.com/stockfish.js@10.0.2/stockfish.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js'
   ],
   ENGINE_DEFAULT_DEPTH: 12,
-  ENGINE_TIMEOUT_MS: 120000, // 2 минуты на ответ движка
   CHESSCOM_API: 'https://api.chess.com/pub',
   EVAL_CLAMP: 6
 };
