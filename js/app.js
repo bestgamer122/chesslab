@@ -11,7 +11,7 @@ const $ = (s) => document.querySelector(s);
 
 const state = {
   game: null, moves: [], analysis: null, ply: 0, orientation: 'w',
-  depth: 12, busy: false, runId: 0, searchAbort: null
+  depth: 14, busy: false, runId: 0, searchAbort: null
 };
 
 const settings = new Settings();
@@ -243,7 +243,7 @@ function loadGame(parsed, meta, orientation) {
   renderGameMeta();
   renderPlayers();
   renderMoveList();
-  graph.setData([], 0); // Очищаем график
+  graph.setData([], 0); 
   goToPly(0);
   
   setTimeout(() => startAnalysis(false), 200);
@@ -285,7 +285,7 @@ async function startAnalysis(isManual) {
     renderSummary(); 
     renderMoveList(); 
     goToPly(state.ply);
-    graph.setData(analysis.points, state.ply); // <--- ВОТ ЭТА СТРОЧКА БЫЛА ПРОЕБАНА
+    graph.setData(analysis.points, state.ply);
     if (isManual) toast('Готово');
   } catch (err) {
     if (err.message !== 'AbortError' && runId === state.runId) {
@@ -406,7 +406,6 @@ function renderSummary() {
   }
   const w = state.analysis.summary.w, b = state.analysis.summary.b;
   
-  // Вернул плашки со статистикой
   p.innerHTML = `
     <div class="panel-head"><h2>Точность</h2></div>
     <div class="acc-grid">
@@ -421,14 +420,32 @@ function renderSummary() {
         <div class="acc-sub">ACPL ${b.acpl}</div>
       </div>
     </div>
-    <div class="cls-row">
-      <span class="cls-pill"><b class="cls-blunder">${w.counts.blunder + b.counts.blunder}</b> зевков</span>
-      <span class="cls-pill"><b class="cls-mistake">${w.counts.mistake + b.counts.mistake}</b> ошибок</span>
-      <span class="cls-pill"><b class="cls-inaccuracy">${w.counts.inaccuracy + b.counts.inaccuracy}</b> неточностей</span>
-      <span class="cls-pill"><b class="cls-brilliant">${w.counts.brilliant + b.counts.brilliant}</b> блестящих</span>
+    
+    <div class="stats-table">
+      <div class="stat-row header">
+        <span></span>
+        <span class="dot white"></span>
+        <span class="dot black"></span>
+      </div>
+      ${genStatRow('Блестящий', w.counts.brilliant, b.counts.brilliant, 'brilliant')}
+      ${genStatRow('Замечательный', w.counts.great, b.counts.great, 'great')}
+      ${genStatRow('Лучший', w.counts.best, b.counts.best, 'best')}
+      ${genStatRow('Ошибка', w.counts.mistake, b.counts.mistake, 'mistake')}
+      ${genStatRow('Упущенный шанс', w.counts.miss, b.counts.miss, 'miss')}
+      ${genStatRow('Зевок', w.counts.blunder, b.counts.blunder, 'blunder')}
     </div>
   `;
   renderPlayers();
+}
+
+function genStatRow(label, wCount, bCount, cls) {
+  return `
+    <div class="stat-row">
+      <span class="stat-name cls-${cls}">${label}</span>
+      <span class="stat-val">${wCount}</span>
+      <span class="stat-val">${bCount}</span>
+    </div>
+  `;
 }
 
 function renderMoveInfo() {

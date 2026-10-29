@@ -25,22 +25,24 @@ export class EvalGraph {
     this.points = points || []; 
     this.current = cur; 
     this.hoverIndex = null; 
-    // Принудительно триггерим ресайз, если элемент был скрыт
-    this.canvas.width = 1; this.canvas.width = this.canvas.clientWidth * (window.devicePixelRatio || 1);
+    // Принудительный сброс для перерисовки, если контейнер был скрыт
+    this.canvas.width = 1; 
+    this.canvas.width = Math.max(300, this.canvas.clientWidth) * (window.devicePixelRatio || 1);
     this._draw(); 
   }
   
   setCurrent(idx) { this.current = idx; this._draw(); }
 
   _getIdx(x) {
-    const pad = 10, w = this.canvas.clientWidth - pad * 2;
+    const pad = 10, w = Math.max(300, this.canvas.clientWidth) - pad * 2;
     const ratio = Math.max(0, Math.min(1, (x - pad) / w));
     return Math.round(ratio * Math.max(1, this.points.length - 1));
   }
 
   _draw() {
     const dpr = window.devicePixelRatio || 1;
-    const w = this.canvas.clientWidth, h = 170;
+    const w = Math.max(300, this.canvas.clientWidth); 
+    const h = 170;
     
     if (this.canvas.width !== w * dpr) {
       this.canvas.width = w * dpr; 

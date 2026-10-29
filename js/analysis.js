@@ -4,9 +4,11 @@ const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const abortError = () => { const e = new Error('AbortError'); e.name = 'AbortError'; return e; };
 
+// Lichess/Chess.com Win Probability
 export function winPercent(cp, mate) {
-  if (mate !== null) return mate > 0 ? 100 : 0;
-  return 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * clamp(cp || 0, -1500, 1500))) - 1);
+  if (mate !== null && mate !== undefined) return mate > 0 ? 100 : 0;
+  const safe = clamp(cp || 0, -1500, 1500);
+  return 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * safe)) - 1);
 }
 
 export function whiteEval(fen, ev) {
@@ -63,18 +65,21 @@ function isSacrifice(fen, square, mover) {
   } catch (_) { return false; }
 }
 
-function accuracyFromLoss(loss) { return clamp(103.1668 * Math.exp(-0.04354 * loss) - 3.1669, 0, 100); }
+// Lichess Accuracy Formula
+function accuracyFromLoss(loss) { 
+  return clamp(103.1668 * Math.exp(-0.04354 * loss) - 3.1669, 0, 100); 
+}
 
-function classify({ isBest, loss, winB, winA, delivMate, missedMate, sac }) {
+function classifyMove({ isBest, cpLoss, winLoss, winBefore, winAfter, delivMate, missedMate, sac }) {
   if (delivMate) return 'best';
   if (missedMate) return 'miss';
-  if (isBest && sac && winA >= 45) return 'brilliant';
-  if (isBest && winB < 50 && winA - winB >= 12) return 'great';
+  if (isBest && sac && winAfter >= 40) return 'brilliant';
+  if (isBest && winBefore < 50 && winAfter - winBefore >= 15) return 'great';
   if (isBest) return 'best';
-  if (loss < 2) return 'excellent';
-  if (loss < 5) return 'good';
-  if (loss < 10) return 'inaccuracy';
-  if (loss < 18) return 'mistake';
+  if (winLoss < 2 && cpLoss < 30) return 'excellent';
+  if (winLoss < 5 && cpLoss < 60) return 'good';
+  if (winLoss < 10 && cpLoss < 120) return 'inaccuracy';
+  if (winLoss < 20 && cpLoss < 250) return 'mistake';
   return 'blunder';
 }
 
@@ -111,24 +116,27 @@ export async function analyzeGame({ moves, startFen, engine, depth, onProgress, 
     const cpB = bW.cp * sign, cpA = aW.cp * sign;
 
     const winB = winPercent(cpB, mateB), winA = winPercent(cpA, mateA);
-    const loss = clamp(winB - winA, 0, 100);
-    const cpLoss = mateB !== null || mateA !== null ? (loss > 0 ? 1000 : 0) : clamp(cpB - cpA, 0, 1000);
+    const winLoss = clamp(winB - winA, 0, 100);
+    const cpLoss = mateB !== null || mateA !== null ? (winLoss > 0 ? 1000 : 0) : clamp(cpB - cpA, 0, 1000);
 
     const playedUci = getUci(m), bestUci = before.bestMove;
     const isBest = bestUci === playedUci;
     const delivMate = /#/.test(m.san);
-    const missedMate = !delivMate && mateB > 0 && !(mateA > 0) && loss >= 8;
+    const missedMate = !delivMate && mateB > 0 && !(mateA > 0) && winLoss >= 8;
 
     const matDelta = calcMaterial(m.after, m.color) - calcMaterial(m.before, m.color);
     const sac = isSacrifice(m.after, m.to, m.color) || matDelta <= -1.9;
-    const classification = classify({ isBest, loss, winB, winA, delivMate, missedMate, sac });
+    
+    const classification = classifyMove({ isBest, cpLoss, winLoss, winBefore: winB, winAfter: winA, delivMate, missedMate, sac });
 
     counts[m.color][classification]++;
-    lossSum[m.color] += loss; cpLossSum[m.color] += cpLoss; mCount[m.color]++;
+    lossSum[m.color] += winLoss; 
+    cpLossSum[m.color] += cpLoss; 
+    mCount[m.color]++;
 
     moveStats.push({
       ...m, ply: i + 1, uci: playedUci, evalBeforeWhite: bW, evalAfterWhite: aW,
-      winBefore: winB, winAfter: winA, loss, cpLoss, accuracy: accuracyFromLoss(loss),
+      winBefore: winB, winAfter: winA, loss: winLoss, cpLoss, accuracy: accuracyFromLoss(winLoss),
       bestMove: bestUci, bestSan: getSan(m.before, bestUci), pvSan: getPvSan(m.before, before.pv),
       isBest, sacrifice: sac, materialDelta: matDelta, classification
     });
