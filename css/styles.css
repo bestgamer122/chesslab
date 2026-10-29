@@ -1,5 +1,5 @@
 /* ============================================================
-   ChessLab — Оформление текста, Glassmorphism, аккуратный UI
+   ChessLab — Оформление, Glassmorphism, Красивый Hero
    ============================================================ */
 :root {
   --bg: #08090c;
@@ -150,24 +150,31 @@ main { padding: 0 clamp(20px, 5vw, 60px) 80px; }
 .feature-chips { display: flex; gap: 10px; margin-top: 30px; flex-wrap: wrap; }
 .chip-soft { padding: 8px 16px; border-radius: 99px; background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border); font-size: 13px; font-weight: 600; color: var(--text-soft); }
 
-/* Hero Mock Dashboard */
-.hero-art { position: relative; width: 100%; display: flex; justify-content: flex-end; }
-.mock-dashboard {
-  width: 100%; max-width: 400px; padding: 24px;
-  transform: perspective(1000px) rotateY(-5deg) rotateX(5deg);
-  transition: transform 0.5s ease;
+/* Hero Art (Конь и фигуры) */
+.hero-art { position: relative; display: grid; place-items: center; min-height: 400px; }
+.hero-glow {
+  position: absolute; width: 400px; height: 400px;
+  background: radial-gradient(circle, rgba(143, 191, 90, 0.15) 0%, transparent 65%);
+  filter: blur(30px); z-index: 0;
 }
-.mock-dashboard:hover { transform: perspective(1000px) rotateY(0) rotateX(0); }
-.mock-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-.mock-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
-.mock-text { font-size: 13px; font-weight: 600; color: var(--text); }
-.mock-badge { background: var(--accent-dim); color: var(--accent); padding: 4px 10px; border-radius: 8px; font-weight: 800; font-size: 14px; }
-.mock-graph { height: 100px; margin-bottom: 20px; position: relative; }
-.mock-graph svg { width: 100%; height: 100%; overflow: visible; }
-.mock-stats { display: flex; gap: 12px; }
-.mock-stat { flex: 1; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 10px; display: flex; flex-direction: column; border: 1px solid var(--panel-border); }
-.mock-stat span { font-size: 11px; text-transform: uppercase; color: var(--muted); font-weight: 700; margin-bottom: 4px; }
-.mock-stat strong { font-size: 18px; color: #fff; font-weight: 800; }
+.hero-knight {
+  position: relative; z-index: 2; font-size: 280px; color: #fff; line-height: 1;
+  text-shadow: 0 30px 60px rgba(0,0,0,0.6), 0 0 30px rgba(143,191,90,0.2);
+  animation: float 6s ease-in-out infinite;
+}
+.float-piece {
+  position: absolute; color: rgba(255, 255, 255, 0.1); z-index: 1; line-height: 1;
+  text-shadow: 0 10px 20px rgba(0,0,0,0.5);
+  animation: float 5s ease-in-out infinite; pointer-events: none;
+}
+.p1 { font-size: 60px; top: 15%; left: 10%; animation-delay: 0s; }
+.p2 { font-size: 80px; bottom: 15%; right: 10%; animation-delay: 1.5s; }
+.p3 { font-size: 50px; top: 25%; right: 15%; animation-delay: 0.8s; color: rgba(143, 191, 90, 0.15); }
+.p4 { font-size: 70px; bottom: 25%; left: 15%; animation-delay: 2.2s; }
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(5deg); }
+}
 
 .home-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; }
 .panel { padding: 28px; }
