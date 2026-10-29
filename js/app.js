@@ -24,12 +24,56 @@ function init() {
   graph = new EvalGraph($('#evalGraph'), (ply) => goToPly(ply));
   engine = new Engine();
 
-  applySettingsToUI();
+  initCustomSelect('depthCustomSelect', state.depth, (val) => {
+    state.depth = parseInt(val, 10);
+    settings.save({ depth: state.depth });
+  });
+  
+  initCustomSelect('themeCustomSelect', settings.get('boardTheme') || 'green', (val) => {
+    // Значение сохранится при нажатии кнопки "Сохранить"
+  });
+
   bindEvents();
   renderSummary();
   renderMoveInfo();
   setEngineState('idle');
 }
+
+// Инициализация кастомных селектов
+function initCustomSelect(id, defaultVal, onChange) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const trigger = el.querySelector('.select-trigger .select-label');
+  const options = el.querySelectorAll('.select-option');
+  
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.querySelectorAll('.custom-select').forEach(s => { if (s !== el) s.classList.remove('open'); });
+    el.classList.toggle('open');
+  });
+
+  options.forEach(opt => {
+    opt.addEventListener('click', () => {
+      const val = opt.dataset.value;
+      trigger.textContent = opt.textContent;
+      options.forEach(o => o.classList.remove('selected'));
+      opt.classList.add('selected');
+      el.classList.remove('open');
+      if (onChange) onChange(val);
+    });
+    
+    // Установка дефолтного значения
+    if (String(opt.dataset.value) === String(defaultVal)) {
+      opt.classList.add('selected');
+      trigger.textContent = opt.textContent;
+    }
+  });
+}
+
+// Закрытие селектов по клику вне
+document.addEventListener('click', () => {
+  document.querySelectorAll('.custom-select').forEach(s => s.classList.remove('open'));
+});
 
 function bindEvents() {
   $('#brandLink').addEventListener('click', (e) => { e.preventDefault(); leaveAnalysis(); });
@@ -47,22 +91,28 @@ function bindEvents() {
     e.target.value = '';
   });
 
-  // Модалки
   $('#pastePgnBtn').addEventListener('click', () => { $('#pgnError').classList.add('hidden'); $('#pgnModal').classList.remove('hidden'); });
   $('#pgnCloseBtn').addEventListener('click', () => $('#pgnModal').classList.add('hidden'));
   $('#pgnCancelBtn').addEventListener('click', () => $('#pgnModal').classList.add('hidden'));
   $('#pgnAnalyzeBtn').addEventListener('click', analyzePgnFromModal);
 
   $('#settingsBtn').addEventListener('click', () => {
-    $('#boardThemeSelect').value = settings.get('boardTheme') || 'green';
+    // Синхронизируем чекбоксы и селект с настройками
+    $('#themeCustomSelect .select-options').querySelectorAll('.select-option').forEach(o => {
+      const isSel = o.dataset.value === (settings.get('boardTheme') || 'green');
+      o.classList.toggle('selected', isSel);
+      if (isSel) $('#themeCustomSelect .select-label').textContent = o.textContent;
+    });
     $('#showCoordsCheckbox').checked = settings.get('showCoords') !== false;
     $('#animationsCheckbox').checked = settings.get('animations') !== false;
     $('#settingsModal').classList.remove('hidden');
   });
+  
   $('#settingsCloseBtn').addEventListener('click', () => $('#settingsModal').classList.add('hidden'));
   $('#settingsSaveBtn').addEventListener('click', () => {
+    const selectedTheme = $('#themeCustomSelect .select-option.selected').dataset.value;
     settings.save({
-      boardTheme: $('#boardThemeSelect').value,
+      boardTheme: selectedTheme,
       showCoords: $('#showCoordsCheckbox').checked,
       animations: $('#animationsCheckbox').checked,
     });
@@ -72,15 +122,9 @@ function bindEvents() {
     toast('Настройки сохранены');
   });
 
-  // Анализ
   $('#reanalyzeBtn').addEventListener('click', () => startAnalysis(true));
   $('#cancelBtn').addEventListener('click', cancelAnalysis);
-  $('#depthSelect').addEventListener('change', (e) => {
-    state.depth = parseInt(e.target.value, 10);
-    settings.save({ depth: state.depth });
-  });
 
-  // Навигация
   $('#firstBtn').addEventListener('click', () => goToPly(0));
   $('#prevBtn').addEventListener('click', () => goToPly(state.ply - 1));
   $('#nextBtn').addEventListener('click', () => goToPly(state.ply + 1));
@@ -101,19 +145,6 @@ function bindEvents() {
       if (e.key === 'End') { e.preventDefault(); goToPly(state.moves.length); }
     }
   });
-}
-
-function applySettingsToUI() {
-  const savedDepth = settings.get('depth');
-  const select = $('#depthSelect');
-  // Если сохраненная глубина есть в опциях, ставим её, иначе дефолт
-  if (savedDepth && Array.from(select.options).some(o => o.value == savedDepth)) {
-    select.value = savedDepth;
-    state.depth = parseInt(savedDepth, 10);
-  } else {
-    select.value = '3';
-    state.depth = 3;
-  }
 }
 
 // ================= ЛОГИКА ЗАГРУЗКИ =================
@@ -279,7 +310,12 @@ function cancelAnalysis(silent) {
   const busy = state.busy;
   state.runId++;
   state.busy = false;
-  engine.stop();
+  
+  // Защита от краша, если в старом движке нет метода stop
+  if (engine && typeof engine.stop === 'function') {
+    engine.stop();
+  }
+  
   $('#progressWrap').classList.add('hidden');
   $('#cancelBtn').classList.add('hidden');
   $('#reanalyzeBtn').disabled = false;

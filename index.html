@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/styles.css?v=8">
+  <link rel="stylesheet" href="css/styles.css?v=10">
 </head>
 <body>
 
@@ -95,13 +95,20 @@
     <div class="analysis-top">
       <div class="game-meta" id="gameMeta"></div>
       <div class="analysis-actions">
-        <label class="depth-field">
+        <div class="depth-field">
           <span>Глубина</span>
-          <select id="depthSelect">
-            <option value="2">2 (быстро)</option>
-            <option value="3" selected>3 (стандарт)</option>
-          </select>
-        </label>
+          <!-- Кастомный селект для глубины -->
+          <div class="custom-select" id="depthCustomSelect">
+            <div class="select-trigger">
+              <span class="select-label">3 (стандарт)</span>
+              <span class="select-arrow">▼</span>
+            </div>
+            <div class="select-options">
+              <div class="select-option" data-value="2">2 (быстро)</div>
+              <div class="select-option selected" data-value="3">3 (стандарт)</div>
+            </div>
+          </div>
+        </div>
         <button class="btn btn-primary" id="reanalyzeBtn" type="button">Анализировать</button>
         <button class="btn btn-danger hidden" id="cancelBtn" type="button">Стоп</button>
         <button class="btn btn-ghost" id="backBtn" type="button">← Назад</button>
@@ -208,12 +215,19 @@
     <div class="settings-content">
       <div class="setting-item">
         <label>Тема доски</label>
-        <select id="boardThemeSelect">
-          <option value="green">Зеленая</option>
-          <option value="brown">Деревянная</option>
-          <option value="blue">Синяя</option>
-          <option value="dark">Тёмная</option>
-        </select>
+        <!-- Кастомный селект для темы -->
+        <div class="custom-select" id="themeCustomSelect">
+          <div class="select-trigger">
+            <span class="select-label">Зеленая</span>
+            <span class="select-arrow">▼</span>
+          </div>
+          <div class="select-options">
+            <div class="select-option selected" data-value="green">Зеленая</div>
+            <div class="select-option" data-value="brown">Деревянная</div>
+            <div class="select-option" data-value="blue">Синяя</div>
+            <div class="select-option" data-value="dark">Тёмная</div>
+          </div>
+        </div>
       </div>
       <div class="setting-item">
         <label>Координаты</label>
@@ -232,6 +246,6 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<script type="module" src="js/app.js?v=7"></script>
+<script type="module" src="js/app.js?v=10"></script>
 </body>
 </html>

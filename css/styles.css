@@ -1,5 +1,5 @@
 /* ============================================================
-   ChessLab — Оформление, Glassmorphism, Красивый Hero
+   ChessLab — Оформление, Кастомные селекты, Glassmorphism
    ============================================================ */
 :root {
   --bg: #08090c;
@@ -126,13 +126,33 @@ a:focus, a:active, button:focus { outline: none !important; }
 .icon-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
 
 /* Поля ввода */
-input[type="text"], select, textarea {
+input[type="text"], textarea {
   background: rgba(0,0,0,0.3); border: 1px solid var(--panel-border); border-radius: 12px;
   padding: 12px 16px; color: var(--text); outline: none; transition: all .2s;
   font-size: 14px; font-weight: 500; font-family: var(--font-body);
 }
-input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-dim); }
+input:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-dim); }
 ::placeholder { color: var(--muted); }
+
+/* ================== КАСТОМНЫЕ СЕЛЕКТЫ ================== */
+.custom-select { position: relative; width: 160px; user-select: none; z-index: 50; }
+.select-trigger {
+  background: rgba(0,0,0,0.3); border: 1px solid var(--panel-border); padding: 10px 14px; border-radius: 10px;
+  display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 14px; font-weight: 500; transition: all .2s;
+}
+.custom-select.open .select-trigger { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+.select-arrow { font-size: 10px; color: var(--muted); transition: transform 0.2s; }
+.custom-select.open .select-arrow { transform: rotate(180deg); color: var(--accent); }
+.select-options {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: #14181e;
+  border: 1px solid var(--panel-border); border-radius: 10px; overflow: hidden;
+  opacity: 0; visibility: hidden; transform: translateY(-10px); transition: all 0.2s;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+}
+.custom-select.open .select-options { opacity: 1; visibility: visible; transform: translateY(0); }
+.select-option { padding: 10px 14px; font-size: 14px; cursor: pointer; transition: background 0.15s; color: var(--text-soft); font-weight: 500; }
+.select-option:hover { background: rgba(255,255,255,0.05); color: #fff; }
+.select-option.selected { color: var(--accent); background: var(--accent-dim); font-weight: 600; }
 
 /* Контейнеры */
 main { padding: 0 clamp(20px, 5vw, 60px) 80px; }
@@ -212,7 +232,7 @@ main { padding: 0 clamp(20px, 5vw, 60px) 80px; }
 .result-chip { background: rgba(255,255,255,0.1); border-radius: 8px; padding: 4px 12px; font-size: 14px; color: #fff; font-family: var(--font-body); font-weight: 700; }
 .gm-sub { color: var(--text-soft); font-size: 14px; margin-top: 6px; font-weight: 500; }
 .analysis-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.depth-field { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-soft); font-weight: 500; }
+.depth-field { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text-soft); font-weight: 500; }
 
 .progress-wrap { padding: 16px 20px; margin-bottom: 24px; }
 .progress-info { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 12px; font-weight: 600; color: var(--text-soft); }
@@ -275,10 +295,9 @@ main { padding: 0 clamp(20px, 5vw, 60px) 80px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
 
 /* Настройки */
-.settings-card { width: 440px; }
+.settings-card { width: 460px; }
 .settings-content { display: flex; flex-direction: column; gap: 20px; }
 .setting-item { display: flex; justify-content: space-between; align-items: center; font-size: 15px; font-weight: 600; color: var(--text-soft); }
-.setting-item select { padding: 10px 14px; }
 .switch { position: relative; display: inline-block; width: 48px; height: 26px; }
 .switch input { opacity: 0; width: 0; height: 0; }
 .slider { position: absolute; cursor: pointer; inset: 0; background-color: rgba(255,255,255,0.1); transition: .3s; border-radius: 34px; border: 1px solid var(--panel-border); }
