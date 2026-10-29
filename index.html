@@ -10,7 +10,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -19,12 +19,12 @@
 <header class="topbar">
   <a class="brand" href="#" id="brandLink" aria-label="ChessLab — на главную">
     <span class="brand-mark">♞</span>
-    <span class="brand-text">ChessLab <em>анализатор</em></span>
+    <span class="brand-text">ChessLab <em>analyzer</em></span>
   </a>
   <div class="topbar-right">
     <span class="engine-pill" id="enginePill">
       <span class="engine-dot"></span>
-      <span id="enginePillText">Stockfish · ожидание</span>
+      <span id="enginePillText">Движок · ожидание</span>
     </span>
     <button class="btn btn-ghost" id="settingsBtn" type="button">⚙️ Настройки</button>
     <button class="btn btn-ghost" id="newGameBtn" type="button">Новая партия</button>
@@ -36,33 +36,29 @@
   <section class="view" id="homeView">
     <div class="hero">
       <div class="hero-copy">
-        <span class="eyebrow">Stockfish · разбор каждого хода</span>
+        <span class="eyebrow">Локальный движок · разбор каждого хода</span>
         <h1>Разбери партию <span>как гроссмейстер</span></h1>
         <p class="hero-text">
-          Загрузите партию с Chess.com или вставьте PGN. Движок оценит каждую позицию,
-          найдёт зевки, ошибки и покажет, как надо было играть.
+          Загрузите партию с Chess.com или вставьте PGN. Встроенный движок мгновенно оценит каждую позицию, найдёт зевки, ошибки и покажет, как надо было играть.
         </p>
         <div class="feature-chips">
-          <span class="chip-soft">Оценка каждого хода</span>
-          <span class="chip-soft">График преимущества</span>
-          <span class="chip-soft">Точность игроков</span>
-          <span class="chip-soft">Без регистрации</span>
+          <span class="chip-soft">Оценка хода</span>
+          <span class="chip-soft">График</span>
+          <span class="chip-soft">Точность</span>
+          <span class="chip-soft">Без интернета</span>
         </div>
       </div>
       <div class="hero-art" aria-hidden="true">
         <div class="hero-glow"></div>
         <div class="hero-knight">♞</div>
-        <div class="float-card fc1"><b>??</b> Зевок · −2.4</div>
-        <div class="float-card fc2"><b>!!</b> Жертва · +1.8</div>
-        <div class="float-card fc3"><b>★</b> Лучший ход</div>
       </div>
     </div>
 
     <div class="home-grid">
-      <div class="panel">
+      <div class="panel glass-panel">
         <div class="panel-head">
           <h2>Партии с Chess.com</h2>
-          <span class="panel-sub">Публичный API · без ключа</span>
+          <span class="panel-sub">API</span>
         </div>
         <form class="search-form" id="chesscomForm">
           <input id="usernameInput" type="text" placeholder="Ник на Chess.com, например Hikaru" autocomplete="off" spellcheck="false">
@@ -73,20 +69,19 @@
         <div id="gamesList" class="games-list"></div>
       </div>
 
-      <div class="panel">
+      <div class="panel glass-panel">
         <div class="panel-head">
           <h2>Своя партия</h2>
           <span class="panel-sub">PGN</span>
         </div>
-        <p class="panel-text">Перетащите файл, выберите его на диске или вставьте текст партии.</p>
-        <div class="drop-zone" id="dropZone" tabindex="0" role="button" aria-label="Загрузить PGN файл">
+        <p class="panel-text">Перетащите файл, выберите на диске или вставьте текст.</p>
+        <div class="drop-zone" id="dropZone" tabindex="0" role="button">
           <span class="drop-icon">⇪</span>
           <strong>Перетащите .pgn сюда</strong>
-          <span>или нажмите, чтобы выбрать файл</span>
+          <span>или нажмите для выбора</span>
           <input type="file" id="fileInput" accept=".pgn,.txt,text/plain" hidden>
         </div>
-        <button class="btn btn-outline btn-full" id="pastePgnBtn" type="button">Вставить PGN текстом</button>
-        <p class="muted small">Подойдут партии с Lichess, Chess.com и любых шахматных программ.</p>
+        <button class="btn btn-outline btn-full" id="pastePgnBtn" type="button">Вставить PGN</button>
       </div>
     </div>
   </section>
@@ -99,10 +94,10 @@
         <label class="depth-field">
           <span>Глубина</span>
           <select id="depthSelect">
-            <option value="8">8 · очень быстро</option>
-            <option value="10">10 · быстро</option>
-            <option value="12" selected>12 · стандарт</option>
-            <option value="14">14 · глубоко</option>
+            <option value="8">8</option>
+            <option value="10">10</option>
+            <option value="12" selected>12 (стандарт)</option>
+            <option value="14">14</option>
           </select>
         </label>
         <button class="btn btn-primary" id="reanalyzeBtn" type="button">Анализировать</button>
@@ -111,7 +106,7 @@
       </div>
     </div>
 
-    <div class="progress-wrap hidden" id="progressWrap">
+    <div class="progress-wrap hidden glass-panel" id="progressWrap">
       <div class="progress-info">
         <span id="progressLabel">Запускаем движок…</span>
         <span id="progressPct">0%</span>
@@ -121,7 +116,7 @@
 
     <div class="analysis-grid">
       <div class="board-col">
-        <div class="player-card" id="blackCard">
+        <div class="player-card glass-panel">
           <span class="pc-dot black"></span>
           <div class="pc-main">
             <strong id="blackName">Чёрные</strong>
@@ -142,16 +137,16 @@
 
         <div class="board-controls">
           <div class="nav-group">
-            <button class="icon-btn" id="firstBtn" type="button" title="В начало">«</button>
-            <button class="icon-btn" id="prevBtn" type="button" title="Предыдущий ход">‹</button>
-            <button class="icon-btn" id="nextBtn" type="button" title="Следующий ход">›</button>
-            <button class="icon-btn" id="lastBtn" type="button" title="В конец">»</button>
+            <button class="icon-btn" id="firstBtn" type="button">«</button>
+            <button class="icon-btn" id="prevBtn" type="button">‹</button>
+            <button class="icon-btn" id="nextBtn" type="button">›</button>
+            <button class="icon-btn" id="lastBtn" type="button">»</button>
           </div>
           <span class="move-counter" id="moveCounter">Ход 0 / 0</span>
-          <button class="icon-btn" id="flipBtn" type="button" title="Перевернуть доску">⇅</button>
+          <button class="icon-btn" id="flipBtn" type="button">⇅</button>
         </div>
 
-        <div class="player-card" id="whiteCard">
+        <div class="player-card glass-panel">
           <span class="pc-dot white"></span>
           <div class="pc-main">
             <strong id="whiteName">Белые</strong>
@@ -162,9 +157,9 @@
       </div>
 
       <aside class="side-col">
-        <div class="panel summary-panel" id="summaryPanel"></div>
+        <div class="panel summary-panel glass-panel" id="summaryPanel"></div>
 
-        <div class="panel graph-panel">
+        <div class="panel graph-panel glass-panel">
           <div class="panel-mini-head">
             <span>Преимущество</span>
             <span class="legend"><i class="lg-white"></i> белые <i class="lg-black"></i> чёрные</span>
@@ -172,11 +167,11 @@
           <canvas id="evalGraph" height="170"></canvas>
         </div>
 
-        <div class="panel move-info" id="moveInfo"></div>
+        <div class="panel move-info glass-panel" id="moveInfo"></div>
 
-        <div class="panel moves-panel">
+        <div class="panel moves-panel glass-panel">
           <div class="moves-head">
-            <span>Ходы</span>
+            <span>История ходов</span>
             <span class="moves-count" id="moveCount"></span>
           </div>
           <div class="move-list" id="moveList"></div>
@@ -186,25 +181,24 @@
   </section>
 </main>
 
-<!-- Модальное окно PGN -->
+<!-- Модалки -->
 <div class="modal hidden" id="pgnModal">
-  <div class="modal-card">
+  <div class="modal-card glass-panel">
     <div class="modal-head">
       <h2>Вставьте PGN</h2>
       <button class="icon-btn" id="pgnCloseBtn" type="button">✕</button>
     </div>
-    <textarea id="pgnTextarea" spellcheck="false" placeholder="[Event &quot;Casual Game&quot;]..."></textarea>
+    <textarea id="pgnTextarea" spellcheck="false"></textarea>
     <div class="modal-error hidden" id="pgnError"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="pgnCancelBtn" type="button">Отмена</button>
-      <button class="btn btn-primary" id="pgnAnalyzeBtn" type="button">Разобрать партию</button>
+      <button class="btn btn-primary" id="pgnAnalyzeBtn" type="button">Разобрать</button>
     </div>
   </div>
 </div>
 
-<!-- Модальное окно настроек -->
 <div class="modal hidden" id="settingsModal">
-  <div class="modal-card settings-card">
+  <div class="modal-card glass-panel settings-card">
     <div class="modal-head">
       <h2>Настройки</h2>
       <button class="icon-btn" id="settingsCloseBtn" type="button">✕</button>
@@ -213,20 +207,14 @@
       <div class="setting-item">
         <label>Тема доски</label>
         <select id="boardThemeSelect">
-          <option value="green">Зеленая (Chess.com)</option>
-          <option value="brown">Деревянная (Lichess)</option>
-          <option value="blue">Синяя (Ice)</option>
-          <option value="dark">Тёмная (Midnight)</option>
+          <option value="green">Зеленая</option>
+          <option value="brown">Деревянная</option>
+          <option value="blue">Синяя</option>
+          <option value="dark">Тёмная</option>
         </select>
       </div>
       <div class="setting-item">
-        <label>Стиль фигур</label>
-        <select id="pieceStyleSelect">
-          <option value="classic">Классика</option>
-        </select>
-      </div>
-      <div class="setting-item">
-        <label>Показывать координаты</label>
+        <label>Координаты</label>
         <label class="switch"><input type="checkbox" id="showCoordsCheckbox" checked><span class="slider"></span></label>
       </div>
       <div class="setting-item">
@@ -242,6 +230,6 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<script type="module" src="js/app.js?v=4"></script>
+<script type="module" src="js/app.js?v=5"></script>
 </body>
 </html>
