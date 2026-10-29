@@ -1,8 +1,9 @@
 import { CONFIG } from './config.js';
 
 /**
- * Обёртка над UCI-движком Stockfish в Web Worker.
- * Последовательно выполняет оценки позиций, умеет останавливаться.
+ * Обёртка над UCI-движком Stockfish.
+ * Загружает код движка через fetch и запускает в Web Worker через Blob.
+ * Это обходит все ограничения CORS на GitHub Pages.
  */
 export class Engine {
   constructor() {
@@ -15,6 +16,7 @@ export class Engine {
     this.lastError = null;
     this._init = null;
     this._initTimer = null;
+    this._blobUrl = null;
   }
 
   async init(onStatus = () => {}) {
@@ -28,20 +30,23 @@ export class Engine {
     onStatus('loading');
     this.lastError = null;
 
-    this.initPromise = new Promise((resolve, reject) => {
+    this.initPromise = new Promise(async (resolve, reject) => {
       this._init = { resolve, reject, settled: false };
 
       this._initTimer = setTimeout(() => {
-        this._failInit(new Error('Движок не ответил за 30 секунд. Проверьте подключение к интернету.'));
+        this._failInit(new Error('Движок не ответил за 30 секунд. Проверьте интернет.'));
       }, 30000);
 
       try {
-        // Принудительно используем ASM.js версию
-      const asmUrl = 'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js?wasm=0';
-      const url = CONFIG.ENGINE_SHIM + '?src=' + encodeURIComponent(asmUrl);
-        this.worker = new Worker(url);
+        // Скачиваем код движка и создаем Blob (обходим CORS)
+        const response = await fetch(CONFIG.ENGINE_CDN);
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const code = await response.text();
+        const blob = new Blob([code], { type: 'application/javascript' });
+        this._blobUrl = URL.createObjectURL(blob);
+        this.worker = new Worker(this._blobUrl);
       } catch (error) {
-        this._failInit(new Error('Не удалось создать Web Worker: ' + error.message));
+        this._failInit(new Error('Не удалось скачать движок: ' + error.message));
         return;
       }
 
@@ -79,7 +84,7 @@ export class Engine {
 
   _handleLine(line) {
     if (line.startsWith('__ENGINE_LOAD_ERROR__')) {
-      this._failInit(new Error('Не удалось загрузить Stockfish с CDN. ' + line.replace('__ENGINE_LOAD_ERROR__', '').trim()));
+      this._failInit(new Error('Не удалось загрузить Stockfish. ' + line.replace('__ENGINE_LOAD_ERROR__', '').trim()));
       return;
     }
 
@@ -221,5 +226,9 @@ export class Engine {
     this.ready = false;
     this.initPromise = null;
     this.current = null;
+    if (this._blobUrl) {
+      URL.revokeObjectURL(this._blobUrl);
+      this._blobUrl = null;
+    }
   }
 }

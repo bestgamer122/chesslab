@@ -19,7 +19,7 @@ export class BoardView {
         showCoordinates: true,
         borderType: BORDER_TYPE.thin,
       },
-      animationDuration: 220,
+      animationDuration: 0, // Отключаем анимацию, чтобы не было багов SVG
       extensions: [{ class: Markers }, { class: Arrows }],
     });
   }
@@ -27,38 +27,45 @@ export class BoardView {
   async setFen(fen, { from = null, to = null, best = null, animate = true } = {}) {
     const token = ++this.token;
     try {
-      await this.board.setPosition(fen, animate);
+      // Принудительно отключаем анимацию, чтобы не было ошибки 'without parentNode'
+      await this.board.setPosition(fen, false);
     } catch (_) {
       return;
     }
     if (token !== this.token) return;
 
-    this.board.removeMarkers();
-    this.board.removeArrows();
+    try {
+      this.board.removeMarkers();
+      this.board.removeArrows();
+    } catch (_) {}
 
     if (from && to) {
-      this.board.addMarker(MARKER_TYPE.square, from);
-      this.board.addMarker(MARKER_TYPE.square, to);
+      try {
+        this.board.addMarker(MARKER_TYPE.square, from);
+        this.board.addMarker(MARKER_TYPE.square, to);
+      } catch (_) {}
     }
 
     if (best && best.length >= 4) {
       const fromSquare = best.slice(0, 2);
       const toSquare = best.slice(2, 4);
       if (fromSquare !== toSquare) {
-        this.board.addArrow(ARROW_TYPE.default, fromSquare, toSquare);
+        try {
+          this.board.addArrow(ARROW_TYPE.default, fromSquare, toSquare);
+        } catch (_) {}
       }
     }
   }
 
   async setOrientation(color, animated = true) {
     try {
-      await this.board.setOrientation(color === 'b' ? COLOR.black : COLOR.white, animated);
+      await this.board.setOrientation(color === 'b' ? COLOR.black : COLOR.white, false);
     } catch (_) { /* ignore */ }
   }
 
   flip() {
     const current = this.board.getOrientation();
-    this.board.setOrientation(current === COLOR.white ? COLOR.black : COLOR.white, true);
+    this.board.setOrientation(current === COLOR.white ? COLOR.black : COLOR.white, false);
   }
 
   destroy() {

@@ -3,10 +3,8 @@
  * Все внешние зависимости подключаются с CDN — сборка не требуется.
  */
 export const CONFIG = {
-  // Движок: Stockfish 10, скомпилированный в чистый JS/asm.js.
-  // Один файл, без внешнего .wasm — работает на GitHub Pages без сервера.
+  // Надёжный ASM.js движок одним файлом
   ENGINE_CDN: 'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js',
-  ENGINE_SHIM: 'js/engine/sf-shim.js',
   ENGINE_DEFAULT_DEPTH: 12,
   ENGINE_TIMEOUT_MS: 90000,
 
