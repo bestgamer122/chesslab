@@ -87,8 +87,10 @@ export class Engine {
         }
         
         if (line === 'uciok') {
-          this.worker.postMessage('setoption name Threads value 1');
-          this.worker.postMessage('setoption name Hash value 64');
+          // Выделяем движку максимум ресурсов для силы
+          const threads = Math.min(navigator.hardwareConcurrency || 2, 4);
+          this.worker.postMessage('setoption name Threads value ' + threads);
+          this.worker.postMessage('setoption name Hash value 128');
           this.worker.postMessage('isready');
           return;
         }
@@ -144,7 +146,7 @@ export class Engine {
     return this.initPromise;
   }
 
-  evaluate(fen, { depth = 14 } = {}) {
+  evaluate(fen, { depth = 18 } = {}) {
     const run = () => new Promise((resolve, reject) => {
       if (!this.ready) return reject(new Error('Движок не готов'));
       
@@ -157,7 +159,7 @@ export class Engine {
           this.current = null;
           reject(new Error('Превышено время анализа позиции'));
         }
-      }, 10000);
+      }, 15000);
 
       this.current = {
         info,

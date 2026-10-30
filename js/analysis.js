@@ -71,8 +71,13 @@ function accuracyFromLoss(loss) {
 function classifyMove({ isBest, cpLoss, winLoss, winBefore, winAfter, delivMate, missedMate, sac }) {
   if (delivMate) return 'best';
   if (missedMate) return 'miss';
-  if (isBest && sac && winAfter >= 40) return 'brilliant';
-  if (isBest && winBefore < 50 && winAfter - winBefore >= 15) return 'great';
+  
+  // Строгий критерий блестящего хода: жертва, лучший ход, хорошая позиция, но не было выигрыша в 1 ход
+  if (isBest && sac && winAfter >= 50 && winBefore < 90) return 'brilliant';
+  
+  // Замечательный: лучший ход, который резко меняет оценку в твою пользу
+  if (isBest && winBefore < 50 && winAfter - winBefore >= 20) return 'great';
+  
   if (isBest) return 'best';
   if (winLoss < 2 && cpLoss < 30) return 'excellent';
   if (winLoss < 5 && cpLoss < 60) return 'good';
@@ -122,7 +127,7 @@ export async function analyzeGame({ moves, startFen, engine, depth, onProgress, 
     const delivMate = /#/.test(m.san);
     const missedMate = !delivMate && mateB > 0 && !(mateA > 0) && winLoss >= 8;
 
-    // Сглаживание шума движка для точности (как на Chess.com)
+    // Сглаживание шума движка для точности
     if (delivMate) {
       winLoss = 0;
       cpLoss = 0;

@@ -57,7 +57,7 @@ export class EvalGraph {
     const midY = padY + plotH / 2;
 
     // Сетка
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)'; 
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)'; 
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(padX, midY); ctx.lineTo(w - padX, midY);
@@ -73,17 +73,14 @@ export class EvalGraph {
       return padY + plotH * (1 - (c + CONFIG.EVAL_CLAMP * 100) / (CONFIG.EVAL_CLAMP * 200));
     };
 
-    // Градиентная заливка
+    // Красивый плавный градиент без красного уебизма
     const grad = ctx.createLinearGradient(0, padY, 0, padY + plotH);
-    grad.addColorStop(0, 'rgba(143, 191, 90, 0.25)');
-    grad.addColorStop(0.5, 'rgba(143, 191, 90, 0)');
-    grad.addColorStop(0.5, 'rgba(239, 107, 107, 0)');
-    grad.addColorStop(1, 'rgba(239, 107, 107, 0.25)');
+    grad.addColorStop(0, 'rgba(143, 191, 90, 0.15)');
+    grad.addColorStop(1, 'rgba(143, 191, 90, 0)');
 
     ctx.beginPath();
     ctx.moveTo(getX(0), padY + plotH);
     
-    // Плавная линия (Кривые Безье)
     for (let i = 1; i < this.points.length; i++) {
       const x0 = getX(i - 1), y0 = getY(this.points[i - 1].cp);
       const x1 = getX(i), y1 = getY(this.points[i].cp);
@@ -91,15 +88,14 @@ export class EvalGraph {
       ctx.bezierCurveTo(cpX, y0, cpX, y1, x1, y1);
     }
     
-    // Закрываем заливку
     ctx.lineTo(getX(this.points.length - 1), padY + plotH);
     ctx.fillStyle = grad; 
     ctx.fill();
 
     // Сама линия
     ctx.beginPath();
-    ctx.strokeStyle = '#e2e8f0'; 
-    ctx.lineWidth = 1.5; 
+    ctx.strokeStyle = '#a6d46e'; 
+    ctx.lineWidth = 2; 
     ctx.lineJoin = 'round';
     
     ctx.moveTo(getX(0), getY(this.points[0].cp));
@@ -114,11 +110,11 @@ export class EvalGraph {
     // Текущий ход (Светящаяся точка)
     const cx = getX(this.current), cy = getY(this.points[this.current]?.cp);
     ctx.beginPath(); 
-    ctx.arc(cx, cy, 5, 0, Math.PI * 2); 
-    ctx.fillStyle = '#a6d46e'; 
+    ctx.arc(cx, cy, 4, 0, Math.PI * 2); 
+    ctx.fillStyle = '#fff'; 
     ctx.fill();
     ctx.shadowColor = '#a6d46e';
-    ctx.shadowBlur = 8;
+    ctx.shadowBlur = 10;
     ctx.stroke();
     ctx.shadowBlur = 0;
 
@@ -126,7 +122,7 @@ export class EvalGraph {
     if (this.hoverIndex !== null) {
       const hx = getX(this.hoverIndex);
       ctx.beginPath(); 
-      ctx.strokeStyle = 'rgba(255,255,255,0.3)'; 
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)'; 
       ctx.lineWidth = 1;
       ctx.moveTo(hx, padY); 
       ctx.lineTo(hx, padY + plotH); 
