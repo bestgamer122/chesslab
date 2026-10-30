@@ -20,6 +20,7 @@ export class BoardView {
     this.premove = null;
 
     // Для Drag & Drop
+    this.pointerDownSquare = null;
     this.draggedSquare = null;
     this.dragStartX = 0;
     this.dragStartY = 0;
@@ -119,24 +120,23 @@ export class BoardView {
   }
 
   _onPointerDown(e) {
-    if (e.button !== 0 && e.pointerType === 'mouse') return; // ЛКМ для мыши
+    if (e.button !== 0 && e.pointerType === 'mouse') return; 
     
-    // Если ход не наш, разрешаем drag для премува
-    const chess = new Chess(this.currentFen);
-    const isMyTurn = chess.turn() === this.playerColor;
-    if (!this.interactive && isMyTurn) return; // Блокируем, если это наш ход, но мы отмотали назад
-
     const sqEl = e.target.closest('.square');
     if (!sqEl) return;
     
-    const sq = sqEl.dataset.sq;
-    const piece = chess.get(sq);
+    this.pointerDownSquare = sqEl.dataset.sq;
+    this.dragStartX = e.clientX;
+    this.dragStartY = e.clientY;
+    this.isDragging = false;
+
+    const chess = new Chess(this.currentFen);
+    const piece = chess.get(this.pointerDownSquare);
+    const isMyTurn = chess.turn() === this.playerColor;
 
     if (piece && piece.color === this.playerColor) {
-      this.draggedSquare = sq;
-      this.dragStartX = e.clientX;
-      this.dragStartY = e.clientY;
-      this.isDragging = false;
+      if (!this.interactive && isMyTurn) return; 
+      this.draggedSquare = this.pointerDownSquare;
       this.el.setPointerCapture(e.pointerId);
     }
   }
@@ -158,18 +158,24 @@ export class BoardView {
   }
 
   _onPointerUp(e) {
-    if (!this.draggedSquare) return;
+    if (!this.pointerDownSquare) return;
 
     if (this.isDragging) {
       this._endVisualDrag(e);
     } else {
-      // Если не сдвинули мышь — это был обычный клик
-      this._handleSquareClick(this.draggedSquare);
+      // Обычный клик (даже если на пустую клетку)
+      const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest('.square');
+      if (targetEl) {
+        this._handleSquareClick(targetEl.dataset.sq);
+      }
     }
 
+    this.pointerDownSquare = null;
     this.draggedSquare = null;
     this.isDragging = false;
-    this.el.releasePointerCapture(e.pointerId);
+    if (this.el.hasPointerCapture(e.pointerId)) {
+      this.el.releasePointerCapture(e.pointerId);
+    }
   }
 
   _startVisualDrag(sq, e) {
@@ -180,12 +186,9 @@ export class BoardView {
     if (!pieceEl) return;
 
     this.dragGhost = pieceEl.cloneNode(true);
-    this.dragGhost.style.position = 'fixed';
-    this.dragGhost.style.pointerEvents = 'none';
-    this.dragGhost.style.zIndex = '1000';
+    this.dragGhost.className = 'piece drag-ghost';
     this.dragGhost.style.width = sqEl.offsetWidth + 'px';
     this.dragGhost.style.height = sqEl.offsetHeight + 'px';
-    this.dragGhost.style.transition = 'none';
     
     document.body.appendChild(this.dragGhost);
     pieceEl.style.opacity = '0.3';
@@ -193,6 +196,8 @@ export class BoardView {
     const chess = new Chess(this.currentFen);
     const moves = chess.moves({ square: sq, verbose: true });
     moves.forEach(m => this.getSquareEl(m.to)?.classList.add('hint'));
+    
+    this._updateVisualDrag(e);
   }
 
   _updateVisualDrag(e) {
@@ -215,11 +220,13 @@ export class BoardView {
     }
     
     const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest('.square');
-    if (targetEl && targetEl.dataset.sq !== this.selectedSq) {
-      this._handleSquareClick(targetEl.dataset.sq);
-    }
     
-    this.clearSelection();
+    // Вызываем логику хода
+    if (targetEl) {
+      this._handleSquareClick(targetEl.dataset.sq);
+    } else {
+      this.clearSelection();
+    }
   }
 
   _handleSquareClick(sq) {
