@@ -203,7 +203,6 @@ async function startPlayGame() {
   $('#playDiffText').textContent = `${state.playElo} ELO`;
   $('#playColorText').textContent = state.playColor === 'w' ? 'Вы играете белыми' : 'Вы играете чёрными';
   
-  // Меняем плашки игроков местами
   const top = $('#topPlayerCard');
   const bot = $('#bottomPlayerCard');
   top.innerHTML = state.playColor === 'w' 
@@ -252,11 +251,13 @@ async function makeEngineMove() {
   if (!state.playMode || state.playChess.isGameOver()) return;
   
   try {
-    // Искусственная задержка для реалистичности
-    const delay = state.playElo < 1400 ? 600 : state.playElo < 2000 ? 1000 : 1500;
-    await new Promise(r => setTimeout(r, delay));
+    // Используем время, чтобы движок не думал слишком долго
+    const time = state.playElo < 1400 ? 500 : state.playElo < 2000 ? 1000 : 1500;
 
-    const ev = await engine.evaluate(state.playChess.fen(), { depth: 18 });
+    // Небольшая задержка для визуала
+    await new Promise(r => setTimeout(r, 300));
+
+    const ev = await engine.evaluateTime(state.playChess.fen(), time);
     
     if (!ev.bestMove || !state.playMode) return;
     
@@ -461,7 +462,6 @@ async function startAnalysis(isManual) {
     await engine.init(status => setEngineState(status));
     if (runId !== state.runId) return;
 
-    // Сбрасываем ELO-лимит на полную силу для анализа
     if (engine.worker) engine.worker.postMessage('setoption name UCI_LimitStrength value false');
 
     const analysis = await analyzeGame({
@@ -652,7 +652,7 @@ function animateAccuracy(targetW, targetB, acplW, acplB) {
   const wAccBar = $('#wAccBar'), bAccBar = $('#bAccBar');
   const wAcplNum = $('#wAcplNum'), bAcplNum = $('#bAcplNum');
 
-  if (!wAccNum) return; // Если анализ завершился и панель перерисовалась
+  if (!wAccNum) return;
 
   function step(timestamp) {
     const progress = Math.min((timestamp - start) / duration, 1);

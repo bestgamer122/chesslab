@@ -29,24 +29,31 @@ export class BoardView {
   setPlayerColor(color) {
     this.playerColor = color;
     if (this.orientation !== color) {
-      this.flip();
+      this.orientation = color;
+      this.renderGrid(); // Перерисовываем сетку заново
+      this.setPosition(this.currentFen, { animate: false });
     }
   }
 
   renderGrid() {
     this.el.innerHTML = '<svg id="arrowLayer"></svg>';
+    this.squares = []; // Очищаем массив перед рендером
+    
+    const files = this.orientation === 'w' ? ['a','b','c','d','e','f','g','h'] : ['h','g','f','e','d','c','b','a'];
+    const ranks = this.orientation === 'w' ? [8,7,6,5,4,3,2,1] : [1,2,3,4,5,6,7,8];
+
     for (let r = 0; r < 8; r++) {
       for (let f = 0; f < 8; f++) {
         const sq = document.createElement('div');
         sq.className = `square ${(r + f) % 2 === 0 ? 'light' : 'dark'}`;
-        sq.dataset.sq = 'abcdefgh'[f] + (8 - r);
+        sq.dataset.sq = files[f] + ranks[r];
         
         const fileLabel = document.createElement('span');
         fileLabel.className = 'coord file';
-        fileLabel.textContent = 'abcdefgh'[f];
+        fileLabel.textContent = files[f];
         const rankLabel = document.createElement('span');
         rankLabel.className = 'coord rank';
-        rankLabel.textContent = 8 - r;
+        rankLabel.textContent = ranks[r];
 
         sq.appendChild(fileLabel);
         sq.appendChild(rankLabel);
@@ -124,26 +131,28 @@ export class BoardView {
 
     this.currentFen = fen;
     const chess = new Chess(fen);
-    const board = chess.board();
     
-    let index = 0;
+    this.squares.forEach(sq => {
+      sq.classList.remove('last-move', 'check');
+      const existing = sq.querySelector('.piece');
+      if (existing) existing.remove();
+    });
+
+    // Проходим по всем клеткам на доске (от a1 до h8)
     for (let r = 0; r < 8; r++) {
       for (let f = 0; f < 8; f++) {
-        const piece = board[r][f];
-        const sq = this.squares[index];
+        const piece = chess.board()[r][f];
+        if (!piece) continue;
         
-        sq.classList.remove('last-move', 'check', 'selected', 'hint');
-        const existing = sq.querySelector('.piece');
-        if (existing) existing.remove();
-        
-        if (piece) {
-          const p = document.createElement('div');
-          p.className = `piece ${piece.color}`;
-          p.dataset.sq = sq.dataset.sq;
-          p.textContent = PIECES[piece.color === 'w' ? piece.type.toUpperCase() : piece.type];
-          sq.appendChild(p);
-        }
-        index++;
+        const sqName = 'abcdefgh'[f] + (8 - r);
+        const sq = this.getSquareEl(sqName);
+        if (!sq) continue;
+
+        const p = document.createElement('div');
+        p.className = `piece ${piece.color}`;
+        p.dataset.sq = sqName;
+        p.textContent = PIECES[piece.color === 'w' ? piece.type.toUpperCase() : piece.type];
+        sq.appendChild(p);
       }
     }
 
@@ -156,7 +165,7 @@ export class BoardView {
       const turn = chess.turn();
       for (let r = 0; r < 8; r++) {
         for (let f = 0; f < 8; f++) {
-          const p = board[r][f];
+          const p = chess.board()[r][f];
           if (p && p.type === 'k' && p.color === turn) {
             this.getSquareEl('abcdefgh'[f] + (8 - r))?.classList.add('check');
           }
@@ -198,19 +207,10 @@ export class BoardView {
     const sqTo = this.getSquareEl(to);
     if (!sqFrom || !sqTo) return;
 
-    const rectBoard = this.el.getBoundingClientRect();
-    const cx = rectBoard.width / 2;
-    const cy = rectBoard.height / 2;
-
-    let x1 = (sqFrom.offsetLeft + sqFrom.offsetWidth / 2);
-    let y1 = (sqFrom.offsetTop + sqFrom.offsetHeight / 2);
-    let x2 = (sqTo.offsetLeft + sqTo.offsetWidth / 2);
-    let y2 = (sqTo.offsetTop + sqTo.offsetHeight / 2);
-
-    if (this.orientation === 'b') {
-      x1 = cx - (x1 - cx); y1 = cy - (y1 - cy);
-      x2 = cx - (x2 - cx); y2 = cy - (y2 - cy);
-    }
+    const x1 = (sqFrom.offsetLeft + sqFrom.offsetWidth / 2);
+    const y1 = (sqFrom.offsetTop + sqFrom.offsetHeight / 2);
+    const x2 = (sqTo.offsetLeft + sqTo.offsetWidth / 2);
+    const y2 = (sqTo.offsetTop + sqTo.offsetHeight / 2);
 
     const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
     defs.innerHTML = `
@@ -232,11 +232,7 @@ export class BoardView {
 
   flip() {
     this.orientation = this.orientation === 'w' ? 'b' : 'w';
-    this.el.style.transform = this.orientation === 'b' ? 'rotate(180deg)' : 'none';
-    this.el.querySelectorAll('.piece').forEach(p => {
-      p.style.transform = this.orientation === 'b' ? 'rotate(180deg)' : 'none';
-    });
-    const best = this.el.dataset.lastBest || null;
-    if (best) this.drawArrow(best);
+    this.renderGrid();
+    this.setPosition(this.currentFen, { animate: false });
   }
 }
