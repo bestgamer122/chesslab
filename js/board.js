@@ -1,8 +1,7 @@
 import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dist/esm/chess.js';
 
 const PIECES = {
-  p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚',
-  P: '♙', N: '♘', B: '♗', R: '♖', Q: '♕', K: '♔'
+  p: 'P', n: 'N', b: 'B', r: 'R', q: 'Q', k: 'K'
 };
 
 export class BoardView {
@@ -17,8 +16,13 @@ export class BoardView {
     this.interactive = false;
     this.playerColor = 'w';
     
+    this.userArrows = [];
+    this.draggingArrow = null;
+    this.premove = null;
+
     this.renderGrid();
     this.updateStyles();
+    this.bindArrowEvents();
   }
 
   setInteractive(state) {
@@ -36,7 +40,7 @@ export class BoardView {
   }
 
   renderGrid() {
-    this.el.innerHTML = '<svg id="arrowLayer"></svg>';
+    this.el.innerHTML = '<svg id="arrowLayer" class="arrow-layer"></svg><svg id="userArrowLayer" class="arrow-layer"></svg>';
     this.squares = [];
     
     const rows = this.orientation === 'w' ? [8,7,6,5,4,3,2,1] : [1,2,3,4,5,6,7,8];
@@ -82,7 +86,26 @@ export class BoardView {
   }
 
   _handleSquareClick(sq) {
-    if (!this.interactive || !this.onMove) return;
+    if (!this.onMove) return;
+
+    // Если играем пре-мув
+    if (!this.interactive && this.playerColor !== new Chess(this.currentFen).turn()) {
+      if (this.selectedSq) {
+         this.premove = { from: this.selectedSq, to: sq };
+         this.onMove({ ...this.premove, isPremove: true });
+         this.clearSelection();
+         this.setPosition(this.currentFen, { animate: false }); // Обновить визуал
+      } else {
+         const piece = new Chess(this.currentFen).get(sq);
+         if (piece && piece.color === this.playerColor) {
+            this.selectedSq = sq;
+            this.getSquareEl(sq).classList.add('selected');
+         }
+      }
+      return;
+    }
+
+    if (!this.interactive) return;
     
     const chess = new Chess(this.currentFen);
     if (chess.turn() !== this.playerColor) return;
@@ -96,6 +119,7 @@ export class BoardView {
       try {
         const move = chess.move({ from: this.selectedSq, to: sq, promotion: 'q' });
         if (move) {
+          this.premove = null; // Сбрасываем премув при обычном ходе
           this.onMove(move);
           this.clearSelection();
         } else {
@@ -133,7 +157,7 @@ export class BoardView {
     const chess = new Chess(fen);
     
     this.squares.forEach(sq => {
-      sq.classList.remove('last-move', 'check');
+      sq.classList.remove('last-move', 'check', 'premove');
       const existing = sq.querySelector('.piece');
       if (existing) existing.remove();
     });
@@ -144,17 +168,18 @@ export class BoardView {
         const piece = board[r][f];
         if (!piece) continue;
         
-        const file = 'abcdefgh'[f];
-        const rank = 8 - r;
-        const sqName = file + rank;
-        
+        const sqName = 'abcdefgh'[f] + (8 - r);
         const sq = this.getSquareEl(sqName);
         if (!sq) continue;
 
         const p = document.createElement('div');
         p.className = `piece ${piece.color}`;
         p.dataset.sq = sqName;
-        p.textContent = PIECES[piece.color === 'w' ? piece.type.toUpperCase() : piece.type];
+        
+        // Скачиваем SVG фигуры с Lichess (cburnett)
+        const pName = piece.color + PIECES[piece.type];
+        p.innerHTML = `<img src="https://lichess1.org/assets/piece/cburnett/${pName}.svg" draggable="false" alt="${pName}">`;
+        
         sq.appendChild(p);
       }
     }
@@ -162,6 +187,11 @@ export class BoardView {
     if (from && to) {
       this.getSquareEl(from)?.classList.add('last-move');
       this.getSquareEl(to)?.classList.add('last-move');
+    }
+
+    if (this.premove) {
+      this.getSquareEl(this.premove.from)?.classList.add('premove');
+      this.getSquareEl(this.premove.to)?.classList.add('premove');
     }
 
     if (chess.inCheck()) {
@@ -196,6 +226,68 @@ export class BoardView {
     }
 
     this.drawArrow(best);
+    this.drawUserArrows();
+  }
+
+  // === РИСОВАНИЕ СТРЕЛОК ===
+  bindArrowEvents() {
+    this.el.addEventListener('contextmenu', (e) => e.preventDefault());
+    
+    let startSq = null;
+
+    this.el.addEventListener('mousedown', (e) => {
+      if (e.button !== 2) return; // Только ПКМ
+      startSq = e.target.closest('.square')?.dataset.sq;
+    });
+
+    this.el.addEventListener('mouseup', (e) => {
+      if (e.button !== 2 || !startSq) return;
+      const endSq = e.target.closest('.square')?.dataset.sq;
+      
+      if (startSq === endSq || !endSq) {
+        this.userArrows = []; // Очищаем, если кликнули по той же клетке
+      } else {
+        const exists = this.userArrows.findIndex(a => a.from === startSq && a.to === endSq);
+        if (exists > -1) this.userArrows.splice(exists, 1); // Удаляем, если уже есть
+        else this.userArrows.push({ from: startSq, to: endSq, color: '#8fbf5a' }); // Зеленая стрелка
+      }
+      this.drawUserArrows();
+      startSq = null;
+    });
+  }
+
+  drawUserArrows() {
+    const svg = this.el.querySelector('#userArrowLayer');
+    svg.innerHTML = '';
+
+    this.userArrows.forEach(arrow => {
+      const sqFrom = this.getSquareEl(arrow.from);
+      const sqTo = this.getSquareEl(arrow.to);
+      if (!sqFrom || !sqTo) return;
+
+      const x1 = sqFrom.offsetLeft + sqFrom.offsetWidth / 2;
+      const y1 = sqFrom.offsetTop + sqFrom.offsetHeight / 2;
+      const x2 = sqTo.offsetLeft + sqTo.offsetWidth / 2;
+      const y2 = sqTo.offsetTop + sqTo.offsetHeight / 2;
+
+      const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+      defs.innerHTML = `
+        <marker id="userArrowhead" markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto">
+          <polygon points="0 0, 4 2, 0 4" fill="${arrow.color}" opacity="0.7"/>
+        </marker>
+      `;
+      svg.appendChild(defs);
+
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+      line.setAttribute('stroke', arrow.color);
+      line.setAttribute('stroke-width', sqFrom.offsetWidth * 0.15);
+      line.setAttribute('marker-end', 'url(#userArrowhead)');
+      line.setAttribute('stroke-linecap', 'round');
+      line.setAttribute('opacity', '0.7');
+      svg.appendChild(line);
+    });
   }
 
   drawArrow(best) {

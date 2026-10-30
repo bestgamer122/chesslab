@@ -308,10 +308,10 @@ input:checked + .slider:before { transform: translateX(22px); }
 .toast.error { background: var(--danger); color: #fff; }
 
 /* ============================================================
-   КАСТОМНАЯ ДОСКА
+   КАСТОМНАЯ ДОСКА С SVG
    ============================================================ */
 .chessboard { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); border-radius: 6px; overflow: hidden; position: relative; user-select: none; }
-.square { position: relative; display: flex; justify-content: center; align-items: center; font-size: min(8vw, 64px); line-height: 1; cursor: pointer; }
+.square { position: relative; display: flex; justify-content: center; align-items: center; line-height: 1; cursor: pointer; }
 .chessboard.theme-green .square.light { background-color: #ebecd0; }
 .chessboard.theme-green .square.dark { background-color: #739552; }
 .chessboard.theme-brown .square.light { background-color: #f0d9b5; }
@@ -325,16 +325,13 @@ input:checked + .slider:before { transform: translateX(22px); }
   position: absolute; width: 100%; height: 100%; 
   display: flex; justify-content: center; align-items: center; 
   z-index: 10; pointer-events: none; will-change: transform; 
-  font-family: "Segoe UI Symbol", "Arial Unicode MS", "Arial", sans-serif;
-  font-weight: normal;
 }
-/* Жестко задаем цвета, чтобы ничего не просвечивало */
-.piece.w { color: #ffffff; text-shadow: 0 0 2px #000, 0 0 4px #000, 1px 1px 0 #000, -1px -1px 0 #000; }
-.piece.b { color: #111111; text-shadow: 0 0 2px #fff, 0 0 4px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff; }
+.piece img { width: 90%; height: 90%; object-fit: contain; filter: drop-shadow(0 4px 4px rgba(0,0,0,0.4)); }
 
 .square.last-move { box-shadow: inset 0 0 0 100px rgba(255, 255, 0, 0.4); }
 .square.check { background: radial-gradient(circle, rgba(239, 68, 68, 0.9) 0%, transparent 70%) !important; }
 .square.selected { box-shadow: inset 0 0 0 100px rgba(143, 191, 90, 0.5); }
+.square.premove { box-shadow: inset 0 0 0 100px rgba(167, 139, 250, 0.5); }
 .square.hint { position: relative; }
 .square.hint::after {
   content: ''; position: absolute; width: 30%; height: 30%; border-radius: 50%;
@@ -346,7 +343,9 @@ input:checked + .slider:before { transform: translateX(22px); }
 .coord.file { bottom: 2px; right: 4px; }
 .coord.rank { top: 2px; left: 4px; }
 .square.dark .coord { color: rgba(255,255,255,0.6); }
-#arrowLayer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 8; }
+
+.arrow-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 8; }
+#userArrowLayer { z-index: 9; } /* Стрелки юзера выше движка */
 
 @media (max-width: 1024px) {
   .analysis-grid { grid-template-columns: 1fr; height: auto; }

@@ -14,7 +14,8 @@ const $ = (s) => document.querySelector(s);
 const state = {
   game: null, moves: [], analysis: null, ply: 0, orientation: 'w',
   depth: 14, busy: false, runId: 0, searchAbort: null,
-  playMode: false, playChess: null, playElo: 1200, playColor: 'w'
+  playMode: false, playChess: null, playElo: 1200, playColor: 'w',
+  premove: null
 };
 
 const settings = new Settings();
@@ -43,6 +44,13 @@ function init() {
   renderSummary();
   renderMoveInfo();
   setEngineState('idle');
+  
+  // Проверяем сохраненный ник
+  const savedNick = localStorage.getItem('chesscom_nick');
+  if (savedNick) {
+    $('#usernameInput').value = savedNick;
+    loadChesscomGames(savedNick);
+  }
 }
 
 function initCustomSelect(id, defaultVal, onChange) {
@@ -83,7 +91,11 @@ function bindEvents() {
   
   $('#chesscomForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    loadChesscomGames($('#usernameInput').value);
+    const nick = $('#usernameInput').value.trim();
+    if (nick) {
+      localStorage.setItem('chesscom_nick', nick);
+      loadChesscomGames(nick);
+    }
   });
 
   $('#dropZone').addEventListener('click', () => $('#fileInput').click());
@@ -199,6 +211,7 @@ async function startPlayGame() {
   state.playMode = true;
   state.playChess = new Chess();
   state.playMoves = [];
+  state.premove = null;
   
   $('#playDiffText').textContent = `${state.playElo} ELO`;
   $('#playColorText').textContent = state.playColor === 'w' ? 'Вы играете белыми' : 'Вы играете чёрными';
@@ -234,11 +247,20 @@ async function startPlayGame() {
 }
 
 async function handlePlayerMove(move) {
-  if (!state.playMode || state.playChess.turn() !== state.playColor) return;
+  if (!state.playMode) return;
+
+  if (move.isPremove) {
+    state.premove = move;
+    boardPlay.setPosition(state.playChess.fen(), { animate: false }); // Перерисовка с премувом
+    return;
+  }
+
+  if (state.playChess.turn() !== state.playColor) return;
   
   playSound(move, state.playChess);
   state.playChess.move(move);
   state.playMoves.push(move.san);
+  state.premove = null;
   
   boardPlay.setPosition(state.playChess.fen(), { from: move.from, to: move.to });
   updatePlayList();
@@ -254,7 +276,7 @@ async function makeEngineMove() {
   
   try {
     const time = state.playElo < 1400 ? 500 : state.playElo < 2000 ? 1000 : 1500;
-    await new Promise(r => setTimeout(r, 300)); // Небольшая пауза перед отправкой в движок
+    await new Promise(r => setTimeout(r, 300));
 
     const ev = await engine.evaluateTime(state.playChess.fen(), time);
     
@@ -271,12 +293,35 @@ async function makeEngineMove() {
       state.playMoves.push(move.san);
       boardPlay.setPosition(state.playChess.fen(), { from: move.from, to: move.to });
       updatePlayList();
-      checkGameOver();
+      
+      if (checkGameOver()) return;
+
+      // ПРОВЕРКА ПРЕМУВА
+      if (state.premove) {
+        const pm = state.premove;
+        state.premove = null;
+        
+        // Проверяем, легален ли премув
+        const testChess = new Chess(state.playChess.fen());
+        try {
+          const pmMove = testChess.move({ from: pm.from, to: pm.to, promotion: 'q' });
+          if (pmMove) {
+            // Премув легален, делаем его!
+            setTimeout(() => handlePlayerMove(pmMove), 50);
+            return; // Выходим, чтобы не включать интерактив (премув сам его выключит)
+          }
+        } catch (_) {}
+        
+        // Если премув нелегален, просто сбрасываем его и включаем клики
+        boardPlay.setPosition(state.playChess.fen(), { animate: true });
+      }
+
+      boardPlay.setInteractive(true);
     }
   } catch (err) {
     if (err.message !== 'AbortError') console.error(err);
   } finally {
-    if (state.playMode && !state.playChess.isGameOver()) {
+    if (state.playMode && !state.playChess.isGameOver() && !state.premove) {
       boardPlay.setInteractive(true);
     }
   }
@@ -311,6 +356,7 @@ function updatePlayList() {
 function finishPlayGame() {
   if (state.playMoves.length < 2) return toast('Сделайте хотя бы пару ходов', 'error');
   state.playMode = false;
+  state.premove = null;
   boardPlay.setInteractive(false);
   
   const pgn = state.playChess.pgn();
@@ -438,6 +484,7 @@ function loadGame(parsed, meta, orientation) {
 function goHome() {
   cancelAnalysis(true);
   state.playMode = false;
+  state.premove = null;
   $('#analysisView').classList.add('hidden');
   $('#playView').classList.add('hidden');
   $('#homeView').classList.remove('hidden');
