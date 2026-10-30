@@ -45,7 +45,6 @@ function init() {
   renderMoveInfo();
   setEngineState('idle');
   
-  // Проверяем сохраненный ник
   const savedNick = localStorage.getItem('chesscom_nick');
   if (savedNick) {
     $('#usernameInput').value = savedNick;
@@ -142,7 +141,6 @@ function bindEvents() {
     toast('Настройки сохранены');
   });
 
-  // Игра
   $('#playEngineBtn').addEventListener('click', () => $('#playSetupModal').classList.remove('hidden'));
   $('#playSetupCloseBtn').addEventListener('click', () => $('#playSetupModal').classList.add('hidden'));
   
@@ -177,7 +175,6 @@ function bindEvents() {
   $('#lastBtn').addEventListener('click', () => goToPly(state.moves.length));
   $('#flipBtn').addEventListener('click', () => board.flip());
 
-  // Навигация в игре
   $('#firstPlayBtn').addEventListener('click', () => goToPlayPly(0));
   $('#prevPlayBtn').addEventListener('click', () => goToPlayPly(state.playPly - 1));
   $('#nextPlayBtn').addEventListener('click', () => goToPlayPly(state.playPly + 1));
@@ -252,7 +249,9 @@ async function startPlayGame() {
   boardPlay.isLive = true;
   boardPlay.setPlayerColor(state.playColor);
   boardPlay.setPosition(state.playChess.fen(), { animate: false });
-  boardPlay.setInteractive(true);
+  
+  // БЛОКИРУЕМ ДОСКУ ДО ГОТОВНОСТИ ДВИЖКА
+  boardPlay.setInteractive(false); 
   updatePlayList();
   
   try {
@@ -261,8 +260,9 @@ async function startPlayGame() {
     toast('Игра началась');
     
     if (state.playColor === 'b') {
-      boardPlay.setInteractive(false);
       makeEngineMove();
+    } else {
+      boardPlay.setInteractive(true); // Включаем, когда движок готов
     }
   } catch (err) {
     toast(err.message, 'error');
@@ -323,7 +323,6 @@ async function makeEngineMove() {
       
       if (checkGameOver()) return;
 
-      // ПРОВЕРКА ПРЕМУВА
       if (state.premove) {
         const pm = state.premove;
         state.premove = null;
@@ -333,23 +332,21 @@ async function makeEngineMove() {
         try {
           const pmMove = testChess.move({ from: pm.from, to: pm.to, promotion: 'q' });
           if (pmMove) {
-            // Премув легален, делаем его!
             setTimeout(() => handlePlayerMove(pmMove), 250);
             return; 
           }
         } catch (_) {}
         
-        // Если премув нелегален, просто сбрасываем его и включаем клики
         boardPlay.setPosition(state.playChess.fen(), { animate: true });
       }
 
       boardPlay.setInteractive(true);
     }
   } catch (err) {
-    if (err.message !== 'AbortError') console.error(err);
-  } finally {
-    if (state.playMode && !state.playChess.isGameOver() && !state.premove) {
-      boardPlay.setInteractive(true);
+    if (err.message !== 'AbortError') {
+      console.error(err);
+      toast('Ошибка движка: ' + err.message, 'error');
+      boardPlay.setInteractive(true); // Разрешаем ходить, чтобы не зависнуть
     }
   }
 }
