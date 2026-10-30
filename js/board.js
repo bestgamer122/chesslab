@@ -17,12 +17,18 @@ export class BoardView {
     this.playerColor = 'w';
     
     this.userArrows = [];
-    this.draggingArrow = null;
     this.premove = null;
+
+    // Для Drag & Drop
+    this.draggedSquare = null;
+    this.dragStartX = 0;
+    this.dragStartY = 0;
+    this.isDragging = false;
+    this.dragGhost = null;
 
     this.renderGrid();
     this.updateStyles();
-    this.bindArrowEvents();
+    this.bindEvents();
   }
 
   setInteractive(state) {
@@ -62,8 +68,6 @@ export class BoardView {
         sq.appendChild(fileLabel);
         sq.appendChild(rankLabel);
         
-        sq.addEventListener('click', () => this._handleSquareClick(sq.dataset.sq));
-        
         this.el.appendChild(sq);
         this.squares.push(sq);
       }
@@ -85,18 +89,154 @@ export class BoardView {
     this.selectedSq = null;
   }
 
+  // ================= DRAG & DROP & CLICKS =================
+  bindEvents() {
+    this.el.addEventListener('pointerdown', this._onPointerDown.bind(this));
+    this.el.addEventListener('pointermove', this._onPointerMove.bind(this));
+    this.el.addEventListener('pointerup', this._onPointerUp.bind(this));
+    this.el.addEventListener('pointercancel', this._onPointerUp.bind(this));
+    
+    // Рисование стрелок ПКМ
+    this.el.addEventListener('contextmenu', (e) => e.preventDefault());
+    let startSq = null;
+    this.el.addEventListener('mousedown', (e) => {
+      if (e.button !== 2) return;
+      startSq = e.target.closest('.square')?.dataset.sq;
+    });
+    this.el.addEventListener('mouseup', (e) => {
+      if (e.button !== 2 || !startSq) return;
+      const endSq = e.target.closest('.square')?.dataset.sq;
+      if (startSq === endSq || !endSq) {
+        this.userArrows = [];
+      } else {
+        const exists = this.userArrows.findIndex(a => a.from === startSq && a.to === endSq);
+        if (exists > -1) this.userArrows.splice(exists, 1);
+        else this.userArrows.push({ from: startSq, to: endSq, color: '#8fbf5a' });
+      }
+      this.drawUserArrows();
+      startSq = null;
+    });
+  }
+
+  _onPointerDown(e) {
+    if (e.button !== 0 && e.pointerType === 'mouse') return; // ЛКМ для мыши
+    
+    // Если ход не наш, разрешаем drag для премува
+    const chess = new Chess(this.currentFen);
+    const isMyTurn = chess.turn() === this.playerColor;
+    if (!this.interactive && isMyTurn) return; // Блокируем, если это наш ход, но мы отмотали назад
+
+    const sqEl = e.target.closest('.square');
+    if (!sqEl) return;
+    
+    const sq = sqEl.dataset.sq;
+    const piece = chess.get(sq);
+
+    if (piece && piece.color === this.playerColor) {
+      this.draggedSquare = sq;
+      this.dragStartX = e.clientX;
+      this.dragStartY = e.clientY;
+      this.isDragging = false;
+      this.el.setPointerCapture(e.pointerId);
+    }
+  }
+
+  _onPointerMove(e) {
+    if (!this.draggedSquare) return;
+
+    const dx = e.clientX - this.dragStartX;
+    const dy = e.clientY - this.dragStartY;
+
+    if (!this.isDragging && Math.hypot(dx, dy) > 5) {
+      this.isDragging = true;
+      this._startVisualDrag(this.draggedSquare, e);
+    }
+
+    if (this.isDragging) {
+      this._updateVisualDrag(e);
+    }
+  }
+
+  _onPointerUp(e) {
+    if (!this.draggedSquare) return;
+
+    if (this.isDragging) {
+      this._endVisualDrag(e);
+    } else {
+      // Если не сдвинули мышь — это был обычный клик
+      this._handleSquareClick(this.draggedSquare);
+    }
+
+    this.draggedSquare = null;
+    this.isDragging = false;
+    this.el.releasePointerCapture(e.pointerId);
+  }
+
+  _startVisualDrag(sq, e) {
+    this.selectedSq = sq;
+    const sqEl = this.getSquareEl(sq);
+    const pieceEl = sqEl.querySelector('.piece');
+    
+    if (!pieceEl) return;
+
+    this.dragGhost = pieceEl.cloneNode(true);
+    this.dragGhost.style.position = 'fixed';
+    this.dragGhost.style.pointerEvents = 'none';
+    this.dragGhost.style.zIndex = '1000';
+    this.dragGhost.style.width = sqEl.offsetWidth + 'px';
+    this.dragGhost.style.height = sqEl.offsetHeight + 'px';
+    this.dragGhost.style.transition = 'none';
+    
+    document.body.appendChild(this.dragGhost);
+    pieceEl.style.opacity = '0.3';
+    
+    const chess = new Chess(this.currentFen);
+    const moves = chess.moves({ square: sq, verbose: true });
+    moves.forEach(m => this.getSquareEl(m.to)?.classList.add('hint'));
+  }
+
+  _updateVisualDrag(e) {
+    if (!this.dragGhost) return;
+    const size = this.dragGhost.offsetWidth;
+    this.dragGhost.style.left = (e.clientX - size / 2) + 'px';
+    this.dragGhost.style.top = (e.clientY - size / 2) + 'px';
+  }
+
+  _endVisualDrag(e) {
+    if (this.dragGhost) {
+      this.dragGhost.remove();
+      this.dragGhost = null;
+    }
+    
+    const sqEl = this.getSquareEl(this.selectedSq);
+    if (sqEl) {
+       const p = sqEl.querySelector('.piece');
+       if (p) p.style.opacity = '1';
+    }
+    
+    const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest('.square');
+    if (targetEl && targetEl.dataset.sq !== this.selectedSq) {
+      this._handleSquareClick(targetEl.dataset.sq);
+    }
+    
+    this.clearSelection();
+  }
+
   _handleSquareClick(sq) {
     if (!this.onMove) return;
 
-    // Если играем пре-мув
-    if (!this.interactive && this.playerColor !== new Chess(this.currentFen).turn()) {
+    const chess = new Chess(this.currentFen);
+    const isMyTurn = chess.turn() === this.playerColor;
+
+    // Логика премува
+    if (!this.interactive && !isMyTurn) {
       if (this.selectedSq) {
          this.premove = { from: this.selectedSq, to: sq };
          this.onMove({ ...this.premove, isPremove: true });
          this.clearSelection();
-         this.setPosition(this.currentFen, { animate: false }); // Обновить визуал
+         this.setPosition(this.currentFen, { animate: false }); 
       } else {
-         const piece = new Chess(this.currentFen).get(sq);
+         const piece = chess.get(sq);
          if (piece && piece.color === this.playerColor) {
             this.selectedSq = sq;
             this.getSquareEl(sq).classList.add('selected');
@@ -106,10 +246,7 @@ export class BoardView {
     }
 
     if (!this.interactive) return;
-    
-    const chess = new Chess(this.currentFen);
-    if (chess.turn() !== this.playerColor) return;
-    
+
     if (this.selectedSq) {
       if (this.selectedSq === sq) {
         this.clearSelection();
@@ -119,7 +256,7 @@ export class BoardView {
       try {
         const move = chess.move({ from: this.selectedSq, to: sq, promotion: 'q' });
         if (move) {
-          this.premove = null; // Сбрасываем премув при обычном ходе
+          this.premove = null;
           this.onMove(move);
           this.clearSelection();
         } else {
@@ -149,6 +286,7 @@ export class BoardView {
     }
   }
 
+  // ================= ОТРИСОВКА =================
   setPosition(fen, { from = null, to = null, best = null, animate = true } = {}) {
     const isAnimated = animate && this.settings.get('animations');
     const oldRect = (from && isAnimated) ? this.getSquareEl(from)?.getBoundingClientRect() : null;
@@ -176,7 +314,6 @@ export class BoardView {
         p.className = `piece ${piece.color}`;
         p.dataset.sq = sqName;
         
-        // Скачиваем SVG фигуры с Lichess (cburnett)
         const pName = piece.color + PIECES[piece.type];
         p.innerHTML = `<img src="https://lichess1.org/assets/piece/cburnett/${pName}.svg" draggable="false" alt="${pName}">`;
         
@@ -227,33 +364,6 @@ export class BoardView {
 
     this.drawArrow(best);
     this.drawUserArrows();
-  }
-
-  // === РИСОВАНИЕ СТРЕЛОК ===
-  bindArrowEvents() {
-    this.el.addEventListener('contextmenu', (e) => e.preventDefault());
-    
-    let startSq = null;
-
-    this.el.addEventListener('mousedown', (e) => {
-      if (e.button !== 2) return; // Только ПКМ
-      startSq = e.target.closest('.square')?.dataset.sq;
-    });
-
-    this.el.addEventListener('mouseup', (e) => {
-      if (e.button !== 2 || !startSq) return;
-      const endSq = e.target.closest('.square')?.dataset.sq;
-      
-      if (startSq === endSq || !endSq) {
-        this.userArrows = []; // Очищаем, если кликнули по той же клетке
-      } else {
-        const exists = this.userArrows.findIndex(a => a.from === startSq && a.to === endSq);
-        if (exists > -1) this.userArrows.splice(exists, 1); // Удаляем, если уже есть
-        else this.userArrows.push({ from: startSq, to: endSq, color: '#8fbf5a' }); // Зеленая стрелка
-      }
-      this.drawUserArrows();
-      startSq = null;
-    });
   }
 
   drawUserArrows() {

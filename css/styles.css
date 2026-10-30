@@ -308,9 +308,13 @@ input:checked + .slider:before { transform: translateX(22px); }
 .toast.error { background: var(--danger); color: #fff; }
 
 /* ============================================================
-   КАСТОМНАЯ ДОСКА С SVG
+   КАСТОМНАЯ ДОСКА С SVG И DRAG & DROP
    ============================================================ */
-.chessboard { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); border-radius: 6px; overflow: hidden; position: relative; user-select: none; }
+.chessboard { 
+  display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); 
+  border-radius: 6px; overflow: hidden; position: relative; user-select: none; 
+  touch-action: none; /* Отключаем скролл и зум при перетаскивании на телефонах */
+}
 .square { position: relative; display: flex; justify-content: center; align-items: center; line-height: 1; cursor: pointer; }
 .chessboard.theme-green .square.light { background-color: #ebecd0; }
 .chessboard.theme-green .square.dark { background-color: #739552; }
@@ -326,7 +330,19 @@ input:checked + .slider:before { transform: translateX(22px); }
   display: flex; justify-content: center; align-items: center; 
   z-index: 10; pointer-events: none; will-change: transform; 
 }
-.piece img { width: 90%; height: 90%; object-fit: contain; filter: drop-shadow(0 4px 4px rgba(0,0,0,0.4)); }
+.piece img { 
+  width: 90%; height: 90%; object-fit: contain; 
+  filter: drop-shadow(0 4px 4px rgba(0,0,0,0.4)); 
+  user-drag: none; -webkit-user-drag: none; 
+}
+
+/* Призрак фигуры при перетаскивании */
+.drag-ghost {
+  position: fixed !important;
+  pointer-events: none;
+  z-index: 1000;
+  cursor: grabbing;
+}
 
 .square.last-move { box-shadow: inset 0 0 0 100px rgba(255, 255, 0, 0.4); }
 .square.check { background: radial-gradient(circle, rgba(239, 68, 68, 0.9) 0%, transparent 70%) !important; }
@@ -345,7 +361,7 @@ input:checked + .slider:before { transform: translateX(22px); }
 .square.dark .coord { color: rgba(255,255,255,0.6); }
 
 .arrow-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 8; }
-#userArrowLayer { z-index: 9; } /* Стрелки юзера выше движка */
+#userArrowLayer { z-index: 9; }
 
 @media (max-width: 1024px) {
   .analysis-grid { grid-template-columns: 1fr; height: auto; }
