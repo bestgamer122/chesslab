@@ -6,21 +6,29 @@ const PIECES = {
 };
 
 export class BoardView {
-  constructor(element, settings) {
+  constructor(element, settings, onMove = null) {
     this.el = element;
     this.settings = settings;
+    this.onMove = onMove;
     this.orientation = 'w';
     this.currentFen = new Chess().fen();
     this.squares = [];
+    this.selectedSq = null;
+    this.interactive = false;
     
     this.renderGrid();
     this.updateStyles();
   }
 
+  setInteractive(state) {
+    this.interactive = state;
+    if (!state) {
+      this.clearSelection();
+    }
+  }
+
   renderGrid() {
-    this.el.innerHTML = '';
     this.el.innerHTML = '<svg id="arrowLayer"></svg>';
-    
     for (let r = 0; r < 8; r++) {
       for (let f = 0; f < 8; f++) {
         const sq = document.createElement('div');
@@ -30,13 +38,14 @@ export class BoardView {
         const fileLabel = document.createElement('span');
         fileLabel.className = 'coord file';
         fileLabel.textContent = 'abcdefgh'[f];
-        
         const rankLabel = document.createElement('span');
         rankLabel.className = 'coord rank';
         rankLabel.textContent = 8 - r;
 
         sq.appendChild(fileLabel);
         sq.appendChild(rankLabel);
+        
+        sq.addEventListener('click', () => this._handleSquareClick(sq.dataset.sq));
         
         this.el.appendChild(sq);
         this.squares.push(sq);
@@ -54,6 +63,52 @@ export class BoardView {
     return this.el.querySelector(`.square[data-sq="${sq}"]`);
   }
 
+  clearSelection() {
+    this.el.querySelectorAll('.square').forEach(s => s.classList.remove('selected', 'hint'));
+    this.selectedSq = null;
+  }
+
+  _handleSquareClick(sq) {
+    if (!this.interactive || !this.onMove) return;
+    
+    const chess = new Chess(this.currentFen);
+    
+    if (this.selectedSq) {
+      if (this.selectedSq === sq) {
+        this.clearSelection();
+        return;
+      }
+      
+      // Пробуем сделать ход
+      const move = chess.move({ from: this.selectedSq, to: sq, promotion: 'q' });
+      if (move) {
+        this.onMove(move);
+        this.clearSelection();
+      } else {
+        // Если ход невозможен, выделяем другую фигуру
+        this.clearSelection();
+        this._selectSquare(sq, chess);
+      }
+    } else {
+      this._selectSquare(sq, chess);
+    }
+  }
+
+  _selectSquare(sq, chess) {
+    const piece = chess.get(sq);
+    if (piece && piece.color === chess.turn()) {
+      this.selectedSq = sq;
+      this.getSquareEl(sq).classList.add('selected');
+      
+      // Показываем возможные ходы
+      const moves = chess.moves({ square: sq, verbose: true });
+      moves.forEach(m => {
+        const el = this.getSquareEl(m.to);
+        if (el) el.classList.add('hint');
+      });
+    }
+  }
+
   setPosition(fen, { from = null, to = null, best = null, animate = true } = {}) {
     const isAnimated = animate && this.settings.get('animations');
     const oldRect = (from && isAnimated) ? this.getSquareEl(from)?.getBoundingClientRect() : null;
@@ -68,7 +123,7 @@ export class BoardView {
         const piece = board[r][f];
         const sq = this.squares[index];
         
-        sq.classList.remove('last-move', 'check');
+        sq.classList.remove('last-move', 'check', 'selected', 'hint');
         const existing = sq.querySelector('.piece');
         if (existing) existing.remove();
         
@@ -100,7 +155,6 @@ export class BoardView {
       }
     }
 
-    // FLIP Анимация
     if (from && to && isAnimated && oldRect) {
       const newEl = this.el.querySelector(`.piece[data-sq="${to}"]`);
       if (newEl) {
@@ -144,12 +198,9 @@ export class BoardView {
     let x2 = (sqTo.offsetLeft + sqTo.offsetWidth / 2);
     let y2 = (sqTo.offsetTop + sqTo.offsetHeight / 2);
 
-    // Если доска перевернута, отражаем координаты относительно центра
     if (this.orientation === 'b') {
-      x1 = cx - (x1 - cx);
-      y1 = cy - (y1 - cy);
-      x2 = cx - (x2 - cx);
-      y2 = cy - (y2 - cy);
+      x1 = cx - (x1 - cx); y1 = cy - (y1 - cy);
+      x2 = cx - (x2 - cx); y2 = cy - (y2 - cy);
     }
 
     const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
@@ -161,10 +212,8 @@ export class BoardView {
     svg.appendChild(defs);
 
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', x1);
-    line.setAttribute('y1', y1);
-    line.setAttribute('x2', x2);
-    line.setAttribute('y2', y2);
+    line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+    line.setAttribute('x2', x2); line.setAttribute('y2', y2);
     line.setAttribute('stroke', 'rgba(143, 191, 90, 0.8)');
     line.setAttribute('stroke-width', sqFrom.offsetWidth * 0.15);
     line.setAttribute('marker-end', 'url(#arrowhead)');
@@ -178,7 +227,6 @@ export class BoardView {
     this.el.querySelectorAll('.piece').forEach(p => {
       p.style.transform = this.orientation === 'b' ? 'rotate(180deg)' : 'none';
     });
-    // Перерисовываем стрелку, если она была
     const best = this.el.dataset.lastBest || null;
     if (best) this.drawArrow(best);
   }

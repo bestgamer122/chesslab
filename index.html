@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/styles.css?v=25">
+  <link rel="stylesheet" href="css/styles.css?v=30">
 </head>
 <body>
 
@@ -27,24 +27,22 @@
       <span id="enginePillText">Движок · ожидание</span>
     </span>
     <button class="btn btn-ghost" id="settingsBtn" type="button">⚙️ Настройки</button>
-    <button class="btn btn-ghost" id="newGameBtn" type="button">Новая партия</button>
   </div>
 </header>
 
 <main>
+  <!-- ================= ГЛАВНАЯ ================= -->
   <section class="view" id="homeView">
     <div class="hero">
       <div class="hero-copy">
-        <span class="eyebrow">Stockfish движок · разбор каждого хода</span>
-        <h1>Разбери партию <span>как ВарафакиДэн!</span></h1>
+        <span class="eyebrow">Локальный движок · разбор каждого хода</span>
+        <h1>Разбери партию <span>как гроссмейстер</span></h1>
         <p class="hero-text">
-          Загрузите партию с Chess.com или вставьте PGN. Встроенный движок мгновенно оценит каждую позицию, найдёт зевки, ошибки и покажет, как надо было играть.
+          Загрузите партию с Chess.com, сыграйте с движком или вставьте PGN. Движок мгновенно оценит каждую позицию и найдёт зевки.
         </p>
-        <div class="feature-chips">
-          <span class="chip-soft">Оценка хода</span>
-          <span class="chip-soft">График</span>
-          <span class="chip-soft">Точность</span>
-          <span class="chip-soft">Чисто для дэна</span>
+        <div class="hero-actions">
+          <button class="btn btn-primary" id="playEngineBtn" type="button">Играть с движком</button>
+          <button class="btn btn-outline" id="pastePgnBtnHero" type="button">Разобрать PGN</button>
         </div>
       </div>
       <div class="hero-art" aria-hidden="true">
@@ -64,7 +62,7 @@
           <span class="panel-sub">API</span>
         </div>
         <form class="search-form" id="chesscomForm">
-          <input id="usernameInput" type="text" placeholder="Ник на Chess.com, например WarafakiDen" autocomplete="off" spellcheck="false">
+          <input id="usernameInput" type="text" placeholder="Ник на Chess.com, например Hikaru" autocomplete="off" spellcheck="false">
           <button class="btn btn-primary" id="loadPlayerBtn" type="submit">Найти</button>
         </form>
         <div id="playerBox" class="player-box hidden"></div>
@@ -84,11 +82,65 @@
           <span>или нажмите для выбора</span>
           <input type="file" id="fileInput" accept=".pgn,.txt,text/plain" hidden>
         </div>
-        <button class="btn btn-outline btn-full" id="pastePgnBtn" type="button">Вставить PGN</button>
       </div>
     </div>
   </section>
 
+  <!-- ================= РЕЖИМ ИГРЫ ================= -->
+  <section class="view hidden" id="playView">
+    <div class="analysis-top">
+      <div class="game-meta">
+        <div class="gm-line"><strong>Игра с движком</strong> <span class="vs">·</span> <strong id="playDiffText">Средний</strong></div>
+        <div class="gm-sub">Вы играете белыми. Удачи!</div>
+      </div>
+      <div class="analysis-actions">
+        <button class="btn btn-danger" id="finishGameBtn" type="button">Завершить и разобрать</button>
+        <button class="btn btn-ghost" id="backFromPlayBtn" type="button">← На главную</button>
+      </div>
+    </div>
+
+    <div class="analysis-grid">
+      <div class="board-col">
+        <div class="player-card glass-panel">
+          <span class="pc-dot black"></span>
+          <div class="pc-main">
+            <strong>Движок Stockfish</strong>
+          </div>
+        </div>
+
+        <div class="board-row">
+          <div class="eval-wrap" style="visibility: hidden;"></div> <!-- Скрываем бар в игре -->
+          <div class="board-wrap" id="boardWrapPlay">
+            <div id="boardPlay" class="chessboard"></div>
+          </div>
+        </div>
+
+        <div class="board-controls">
+          <span class="move-counter" id="playMoveCounter">Ход 0</span>
+          <button class="icon-btn" id="flipPlayBtn" type="button">⇅</button>
+        </div>
+
+        <div class="player-card glass-panel">
+          <span class="pc-dot white"></span>
+          <div class="pc-main">
+            <strong>Вы</strong>
+          </div>
+        </div>
+      </div>
+
+      <aside class="side-col">
+        <div class="panel moves-panel glass-panel" style="flex: 1;">
+          <div class="moves-head">
+            <span>История ходов</span>
+            <span class="moves-count" id="playMoveCount">0</span>
+          </div>
+          <div class="move-list" id="playMoveList"></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ================= АНАЛИЗ ================= -->
   <section class="view hidden" id="analysisView">
     <div class="analysis-top">
       <div class="game-meta" id="gameMeta"></div>
@@ -171,7 +223,7 @@
             <span>Преимущество</span>
             <span class="legend"><i class="lg-white"></i> белые <i class="lg-black"></i> чёрные</span>
           </div>
-          <canvas id="evalGraph" height="170"></canvas>
+          <canvas id="evalGraph" height="150"></canvas>
         </div>
 
         <div class="panel move-info-card glass-panel" id="moveInfo"></div>
@@ -188,10 +240,11 @@
   </section>
 </main>
 
+<!-- Модалки -->
 <div class="modal hidden" id="pgnModal">
   <div class="modal-card glass-panel">
     <div class="modal-head">
-      <h2>Вставьте PGN</h2>
+      <h2>Вставить PGN</h2>
       <button class="icon-btn" id="pgnCloseBtn" type="button">✕</button>
     </div>
     <textarea id="pgnTextarea" spellcheck="false"></textarea>
@@ -233,6 +286,10 @@
         <label>Анимация ходов</label>
         <label class="switch"><input type="checkbox" id="animationsCheckbox" checked><span class="slider"></span></label>
       </div>
+      <div class="setting-item">
+        <label>Звуки ходов</label>
+        <label class="switch"><input type="checkbox" id="soundCheckbox" checked><span class="slider"></span></label>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-primary" id="settingsSaveBtn" type="button">Сохранить</button>
@@ -240,8 +297,36 @@
   </div>
 </div>
 
+<div class="modal hidden" id="playSetupModal">
+  <div class="modal-card glass-panel settings-card">
+    <div class="modal-head">
+      <h2>Настройка игры</h2>
+      <button class="icon-btn" id="playSetupCloseBtn" type="button">✕</button>
+    </div>
+    <div class="settings-content">
+      <div class="setting-item">
+        <label>Уровень сложности</label>
+        <div class="custom-select" id="diffCustomSelect" style="width: 180px;">
+          <div class="select-trigger">
+            <span class="select-label">Средний</span>
+            <span class="select-arrow">▼</span>
+          </div>
+          <div class="select-options">
+            <div class="select-option" data-value="1">Легко</div>
+            <div class="select-option selected" data-value="2">Средний</div>
+            <div class="select-option" data-value="3">Сложно</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="startPlayBtn" type="button">Начать игру</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status"></div>
 
-<script type="module" src="js/app.js?v=25"></script>
+<script type="module" src="js/app.js?v=30"></script>
 </body>
 </html>

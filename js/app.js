@@ -6,21 +6,29 @@ import { analyzeGame } from './analysis.js';
 import { fetchRecentGames, timeClassRu } from './chesscom.js';
 import { BoardView } from './board.js';
 import { EvalGraph } from './graph.js';
+import { SoundPlayer } from './sounds.js';
+import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dist/esm/chess.js';
 
 const $ = (s) => document.querySelector(s);
 
 const state = {
   game: null, moves: [], analysis: null, ply: 0, orientation: 'w',
-  depth: 14, busy: false, runId: 0, searchAbort: null
+  depth: 14, busy: false, runId: 0, searchAbort: null,
+  playMode: false, playChess: null, playDiff: 2
 };
 
 const settings = new Settings();
-let board, graph, engine, toastTimer;
+const sounds = new SoundPlayer();
+let board, boardPlay, graph, engine, toastTimer;
 
 init();
 
 function init() {
+  sounds.toggle(settings.get('sound') !== false);
+  
   board = new BoardView($('#board'), settings);
+  boardPlay = new BoardView($('#boardPlay'), settings, handlePlayerMove);
+  
   graph = new EvalGraph($('#evalGraph'), (ply) => goToPly(ply));
   engine = new Engine();
 
@@ -30,6 +38,7 @@ function init() {
   });
   
   initCustomSelect('themeCustomSelect', settings.get('boardTheme') || 'green', () => {});
+  initCustomSelect('diffCustomSelect', '2', (val) => { state.playDiff = parseInt(val, 10); });
 
   bindEvents();
   renderSummary();
@@ -71,10 +80,8 @@ document.addEventListener('click', () => {
 });
 
 function bindEvents() {
-  $('#brandLink').addEventListener('click', (e) => { e.preventDefault(); leaveAnalysis(); });
-  $('#newGameBtn').addEventListener('click', leaveAnalysis);
-  $('#backBtn').addEventListener('click', leaveAnalysis);
-
+  $('#brandLink').addEventListener('click', (e) => { e.preventDefault(); goHome(); });
+  
   $('#chesscomForm').addEventListener('submit', (e) => {
     e.preventDefault();
     loadChesscomGames($('#usernameInput').value);
@@ -86,7 +93,7 @@ function bindEvents() {
     e.target.value = '';
   });
 
-  $('#pastePgnBtn').addEventListener('click', () => { $('#pgnError').classList.add('hidden'); $('#pgnModal').classList.remove('hidden'); });
+  $('#pastePgnBtnHero').addEventListener('click', () => { $('#pgnError').classList.add('hidden'); $('#pgnModal').classList.remove('hidden'); });
   $('#pgnCloseBtn').addEventListener('click', () => $('#pgnModal').classList.add('hidden'));
   $('#pgnCancelBtn').addEventListener('click', () => $('#pgnModal').classList.add('hidden'));
   $('#pgnAnalyzeBtn').addEventListener('click', analyzePgnFromModal);
@@ -99,31 +106,48 @@ function bindEvents() {
     });
     $('#showCoordsCheckbox').checked = settings.get('showCoords') !== false;
     $('#animationsCheckbox').checked = settings.get('animations') !== false;
+    $('#soundCheckbox').checked = settings.get('sound') !== false;
     $('#settingsModal').classList.remove('hidden');
   });
   
   $('#settingsCloseBtn').addEventListener('click', () => $('#settingsModal').classList.add('hidden'));
   $('#settingsSaveBtn').addEventListener('click', () => {
     const selectedTheme = $('#themeCustomSelect .select-option.selected').dataset.value;
+    const soundState = $('#soundCheckbox').checked;
+    
     settings.save({
       boardTheme: selectedTheme,
       showCoords: $('#showCoordsCheckbox').checked,
       animations: $('#animationsCheckbox').checked,
+      sound: soundState
     });
+    
+    sounds.toggle(soundState);
     board.updateStyles();
+    boardPlay.updateStyles();
     board.setPosition(board.currentFen, { animate: false });
+    boardPlay.setPosition(boardPlay.currentFen, { animate: false });
     $('#settingsModal').classList.add('hidden');
     toast('Настройки сохранены');
   });
 
+  // Игра
+  $('#playEngineBtn').addEventListener('click', () => $('#playSetupModal').classList.remove('hidden'));
+  $('#playSetupCloseBtn').addEventListener('click', () => $('#playSetupModal').classList.add('hidden'));
+  $('#startPlayBtn').addEventListener('click', startPlayGame);
+  $('#finishGameBtn').addEventListener('click', finishPlayGame);
+  $('#backFromPlayBtn').addEventListener('click', goHome);
+
   $('#reanalyzeBtn').addEventListener('click', () => startAnalysis(true));
   $('#cancelBtn').addEventListener('click', cancelAnalysis);
+  $('#backBtn').addEventListener('click', goHome);
 
   $('#firstBtn').addEventListener('click', () => goToPly(0));
   $('#prevBtn').addEventListener('click', () => goToPly(state.ply - 1));
   $('#nextBtn').addEventListener('click', () => goToPly(state.ply + 1));
   $('#lastBtn').addEventListener('click', () => goToPly(state.moves.length));
   $('#flipBtn').addEventListener('click', () => board.flip());
+  $('#flipPlayBtn').addEventListener('click', () => boardPlay.flip());
   
   $('#moveList').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-ply]');
@@ -141,6 +165,127 @@ function bindEvents() {
   });
 }
 
+function playSound(move, chess) {
+  if (!move) return;
+  if (chess.inCheck()) sounds.playCheck();
+  else if (move.captured) sounds.playCapture();
+  else sounds.playMove();
+}
+
+// ================= ИГРА ПРОТИВ ДВИЖКА =================
+async function startPlayGame() {
+  $('#playSetupModal').classList.add('hidden');
+  $('#homeView').classList.add('hidden');
+  $('#analysisView').classList.add('hidden');
+  $('#playView').classList.remove('hidden');
+  
+  state.playMode = true;
+  state.playChess = new Chess();
+  state.playMoves = [];
+  
+  const diffText = { 1: 'Легко', 2: 'Средний', 3: 'Сложно' }[state.playDiff];
+  $('#playDiffText').textContent = diffText;
+  
+  boardPlay.setPosition(state.playChess.fen(), { animate: false });
+  boardPlay.setInteractive(true);
+  updatePlayList();
+  
+  try {
+    await engine.init(status => setEngineState(status));
+    toast('Игра началась. Ваш ход!');
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function handlePlayerMove(move) {
+  if (!state.playMode || state.playChess.turn() !== 'w') return;
+  
+  playSound(move, state.playChess);
+  state.playChess.move(move);
+  state.playMoves.push(move.san);
+  
+  boardPlay.setPosition(state.playChess.fen(), { from: move.from, to: move.to });
+  updatePlayList();
+  
+  if (checkGameOver()) return;
+  
+  // Ход движка
+  boardPlay.setInteractive(false);
+  await makeEngineMove();
+}
+
+async function makeEngineMove() {
+  if (!state.playMode || state.playChess.isGameOver()) return;
+  
+  try {
+    const depth = state.playDiff === 1 ? 1 : state.playDiff === 2 ? 8 : 14;
+    const ev = await engine.evaluate(state.playChess.fen(), { depth });
+    
+    if (!ev.bestMove || !state.playMode) return;
+    
+    const move = state.playChess.move({ 
+      from: ev.bestMove.slice(0,2), 
+      to: ev.bestMove.slice(2,4), 
+      promotion: ev.bestMove[4] || 'q' 
+    });
+    
+    if (move) {
+      playSound(move, state.playChess);
+      state.playMoves.push(move.san);
+      boardPlay.setPosition(state.playChess.fen(), { from: move.from, to: move.to });
+      updatePlayList();
+      checkGameOver();
+    }
+  } catch (err) {
+    if (err.message !== 'AbortError') console.error(err);
+  } finally {
+    if (state.playMode && !state.playChess.isGameOver()) {
+      boardPlay.setInteractive(true);
+    }
+  }
+}
+
+function checkGameOver() {
+  if (state.playChess.isGameOver()) {
+    boardPlay.setInteractive(false);
+    let msg = 'Игра окончена. ';
+    if (state.playChess.isCheckmate()) msg += state.playChess.turn() === 'w' ? 'Вам мат.' : 'Вы победили!';
+    else if (state.playChess.isDraw()) msg += 'Ничья.';
+    toast(msg);
+    return true;
+  }
+  return false;
+}
+
+function updatePlayList() {
+  const el = $('#playMoveList');
+  let html = '';
+  for (let i = 0; i < state.playMoves.length; i += 2) {
+    html += `<div class="move-row"><div class="move-no">${i/2 + 1}.</div>`;
+    html += `<div class="move-btn">${state.playMoves[i]}</div>`;
+    html += i+1 < state.playMoves.length ? `<div class="move-btn">${state.playMoves[i+1]}</div>` : '<div></div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+  $('#playMoveCount').textContent = state.playMoves.length + ' ходов';
+  $('#playMoveCounter').textContent = `Ход ${Math.ceil(state.playMoves.length/2)}`;
+}
+
+function finishPlayGame() {
+  if (state.playMoves.length < 2) return toast('Сделайте хотя бы пару ходов', 'error');
+  state.playMode = false;
+  boardPlay.setInteractive(false);
+  
+  const pgn = state.playChess.pgn();
+  const parsed = parsePgn(pgn);
+  const meta = gameMetaFromHeaders(parsed.headers, {
+    event: 'Игра с движком', date: 'Сегодня', whiteName: 'Вы', blackName: 'Stockfish', result: '*'
+  });
+  loadGame(parsed, meta, 'w');
+}
+
+// ================= ЗАГРУЗКА ПАРТИЙ =================
 async function loadChesscomGames(username) {
   if (!username.trim()) return setGamesState('Введите ник', 'error');
   if (state.searchAbort) state.searchAbort.abort();
@@ -228,6 +373,7 @@ function analyzePgnFromModal() {
   }
 }
 
+// ================= АНАЛИЗ =================
 function loadGame(parsed, meta, orientation) {
   cancelAnalysis(true);
   state.game = { ...parsed, meta };
@@ -237,6 +383,7 @@ function loadGame(parsed, meta, orientation) {
   state.orientation = orientation || 'w';
 
   $('#homeView').classList.add('hidden');
+  $('#playView').classList.add('hidden');
   $('#analysisView').classList.remove('hidden');
   window.scrollTo(0, 0);
 
@@ -249,9 +396,11 @@ function loadGame(parsed, meta, orientation) {
   setTimeout(() => startAnalysis(false), 200);
 }
 
-function leaveAnalysis() {
+function goHome() {
   cancelAnalysis(true);
+  state.playMode = false;
   $('#analysisView').classList.add('hidden');
+  $('#playView').classList.add('hidden');
   $('#homeView').classList.remove('hidden');
 }
 
@@ -286,6 +435,10 @@ async function startAnalysis(isManual) {
     renderMoveList(); 
     goToPly(state.ply);
     graph.setData(analysis.points, state.ply);
+    
+    // Запускаем анимацию цифр
+    animateAccuracy(state.analysis.summary.w.accuracy, state.analysis.summary.b.accuracy, state.analysis.summary.w.acpl, state.analysis.summary.b.acpl);
+
     if (isManual) toast('Готово');
   } catch (err) {
     if (err.message !== 'AbortError' && runId === state.runId) {
@@ -349,8 +502,6 @@ function goToPly(ply) {
 function highlightMove() {
   const list = $('#moveList');
   list.querySelectorAll('[data-ply]').forEach(b => b.classList.toggle('active', +b.dataset.ply === state.ply));
-  
-  // Авто-скролл к активному ходу
   const active = list.querySelector('.active');
   if (active) active.scrollIntoView({ block: 'nearest' });
 }
@@ -414,14 +565,14 @@ function renderSummary() {
   p.innerHTML = `
     <div class="acc-grid">
       <div class="acc-card">
-        <div class="acc-top"><span class="dot white"></span>Белые<span class="acc-num">${w.accuracy.toFixed(1)}%</span></div>
-        <div class="acc-track"><span style="width:${w.accuracy}%; background: var(--accent)"></span></div>
-        <div class="acc-sub">ACPL ${w.acpl}</div>
+        <div class="acc-top"><span class="dot white"></span>Белые<span class="acc-num" id="wAccNum">0.0%</span></div>
+        <div class="acc-track"><span id="wAccBar" style="width:0%; background: var(--accent)"></span></div>
+        <div class="acc-sub">ACPL <span id="wAcplNum">0</span></div>
       </div>
       <div class="acc-card">
-        <div class="acc-top"><span class="dot black"></span>Чёрные<span class="acc-num">${b.accuracy.toFixed(1)}%</span></div>
-        <div class="acc-track"><span style="width:${b.accuracy}%; background: #8fa3bd"></span></div>
-        <div class="acc-sub">ACPL ${b.acpl}</div>
+        <div class="acc-top"><span class="dot black"></span>Чёрные<span class="acc-num" id="bAccNum">0.0%</span></div>
+        <div class="acc-track"><span id="bAccBar" style="width:0%; background: #8fa3bd"></span></div>
+        <div class="acc-sub">ACPL <span id="bAcplNum">0</span></div>
       </div>
     </div>
     
@@ -450,6 +601,37 @@ function genStatRow(label, wCount, bCount, cls) {
       <span class="stat-val">${bCount}</span>
     </div>
   `;
+}
+
+function animateAccuracy(targetW, targetB, acplW, acplB) {
+  const duration = 1000;
+  const start = performance.now();
+  
+  const wAccNum = $('#wAccNum'), bAccNum = $('#bAccNum');
+  const wAccBar = $('#wAccBar'), bAccBar = $('#bAccBar');
+  const wAcplNum = $('#wAcplNum'), bAcplNum = $('#bAcplNum');
+
+  if (!wAccNum) return; // Если анализ завершился и панель перерисовалась
+
+  function step(timestamp) {
+    const progress = Math.min((timestamp - start) / duration, 1);
+    const easeOut = 1 - Math.pow(1 - progress, 3); // Cubic ease-out
+    
+    // Точность
+    wAccNum.textContent = (targetW * easeOut).toFixed(1) + '%';
+    bAccNum.textContent = (targetB * easeOut).toFixed(1) + '%';
+    wAccBar.style.width = (targetW * easeOut) + '%';
+    bAccBar.style.width = (targetB * easeOut) + '%';
+    
+    // ACPL
+    wAcplNum.textContent = Math.round(acplW * easeOut);
+    bAcplNum.textContent = Math.round(acplB * easeOut);
+
+    if (progress < 1) {
+      requestAnimationFrame(step);
+    }
+  }
+  requestAnimationFrame(step);
 }
 
 function renderMoveInfo() {
