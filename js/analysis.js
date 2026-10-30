@@ -14,7 +14,7 @@ export function whiteEval(fen, ev) {
   const turn = fen.split(' ')[1] || 'w';
   if (ev.mate !== null) {
     const m = turn === 'w' ? ev.mate : -ev.mate;
-    return { cp: m > 0 ? 20000 : -20000, mate: m };
+    return { cp: 0, mate: m }; // Исправлено: cp = 0, чтобы отображался M
   }
   const cp = Number.isFinite(ev.cp) ? ev.cp : 0;
   return { cp: turn === 'w' ? cp : -cp, mate: null };
@@ -71,13 +71,8 @@ function accuracyFromLoss(loss) {
 function classifyMove({ isBest, cpLoss, winLoss, winBefore, winAfter, delivMate, missedMate, sac }) {
   if (delivMate) return 'best';
   if (missedMate) return 'miss';
-  
-  // Строгий критерий блестящего хода: жертва, лучший ход, хорошая позиция, но не было выигрыша в 1 ход
   if (isBest && sac && winAfter >= 50 && winBefore < 90) return 'brilliant';
-  
-  // Замечательный: лучший ход, который резко меняет оценку в твою пользу
   if (isBest && winBefore < 50 && winAfter - winBefore >= 20) return 'great';
-  
   if (isBest) return 'best';
   if (winLoss < 2 && cpLoss < 30) return 'excellent';
   if (winLoss < 5 && cpLoss < 60) return 'good';
@@ -127,7 +122,6 @@ export async function analyzeGame({ moves, startFen, engine, depth, onProgress, 
     const delivMate = /#/.test(m.san);
     const missedMate = !delivMate && mateB > 0 && !(mateA > 0) && winLoss >= 8;
 
-    // Сглаживание шума движка для точности
     if (delivMate) {
       winLoss = 0;
       cpLoss = 0;

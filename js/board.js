@@ -163,8 +163,8 @@ export class BoardView {
     if (this.isDragging) {
       this._endVisualDrag(e);
     } else {
-      // Обычный клик (даже если на пустую клетку)
-      const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest('.square');
+      // Обычный клик по клетке
+      const targetEl = e.target.closest('.square');
       if (targetEl) {
         this._handleSquareClick(targetEl.dataset.sq);
       }
@@ -219,9 +219,9 @@ export class BoardView {
        if (p) p.style.opacity = '1';
     }
     
+    // Используем elementFromPoint, так как dragGhost перекрывал цель
     const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest('.square');
     
-    // Вызываем логику хода
     if (targetEl) {
       this._handleSquareClick(targetEl.dataset.sq);
     } else {
@@ -235,8 +235,8 @@ export class BoardView {
     const chess = new Chess(this.currentFen);
     const isMyTurn = chess.turn() === this.playerColor;
 
-    // Логика премува
-    if (!this.interactive && !isMyTurn) {
+    // Логика премува (работает, даже если ход не наш или мы листаем историю)
+    if (!this.interactive) {
       if (this.selectedSq) {
          this.premove = { from: this.selectedSq, to: sq };
          this.onMove({ ...this.premove, isPremove: true });

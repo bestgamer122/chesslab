@@ -45,6 +45,7 @@ function init() {
   renderMoveInfo();
   setEngineState('idle');
   
+  // Проверяем сохраненный ник
   const savedNick = localStorage.getItem('chesscom_nick');
   if (savedNick) {
     $('#usernameInput').value = savedNick;
@@ -141,6 +142,7 @@ function bindEvents() {
     toast('Настройки сохранены');
   });
 
+  // Игра
   $('#playEngineBtn').addEventListener('click', () => $('#playSetupModal').classList.remove('hidden'));
   $('#playSetupCloseBtn').addEventListener('click', () => $('#playSetupModal').classList.add('hidden'));
   
@@ -175,6 +177,7 @@ function bindEvents() {
   $('#lastBtn').addEventListener('click', () => goToPly(state.moves.length));
   $('#flipBtn').addEventListener('click', () => board.flip());
 
+  // Навигация в игре
   $('#firstPlayBtn').addEventListener('click', () => goToPlayPly(0));
   $('#prevPlayBtn').addEventListener('click', () => goToPlayPly(state.playPly - 1));
   $('#nextPlayBtn').addEventListener('click', () => goToPlayPly(state.playPly + 1));
@@ -250,7 +253,6 @@ async function startPlayGame() {
   boardPlay.setPlayerColor(state.playColor);
   boardPlay.setPosition(state.playChess.fen(), { animate: false });
   
-  // БЛОКИРУЕМ ДОСКУ ДО ГОТОВНОСТИ ДВИЖКА
   boardPlay.setInteractive(false); 
   updatePlayList();
   
@@ -262,7 +264,7 @@ async function startPlayGame() {
     if (state.playColor === 'b') {
       makeEngineMove();
     } else {
-      boardPlay.setInteractive(true); // Включаем, когда движок готов
+      boardPlay.setInteractive(true);
     }
   } catch (err) {
     toast(err.message, 'error');
@@ -346,7 +348,8 @@ async function makeEngineMove() {
     if (err.message !== 'AbortError') {
       console.error(err);
       toast('Ошибка движка: ' + err.message, 'error');
-      boardPlay.setInteractive(true); // Разрешаем ходить, чтобы не зависнуть
+      boardPlay.setInteractive(true);
+      boardPlay.setPosition(state.playChess.fen(), { animate: false });
     }
   }
 }
@@ -406,13 +409,18 @@ function updatePlayList() {
 }
 
 function finishPlayGame() {
-  if (state.playMoves.length < 2) return toast('Сделайте хотя бы пару ходов', 'error');
+  if (state.playPly < 2) return toast('Сделайте хотя бы пару ходов', 'error');
   state.playMode = false;
   state.premove = null;
   boardPlay.premove = null;
   boardPlay.setInteractive(false);
   
-  const pgn = state.playChess.pgn();
+  const tempChess = new Chess();
+  for(let i=0; i<state.playPly; i++) {
+    tempChess.move(state.playMoves[i]);
+  }
+  
+  const pgn = tempChess.pgn();
   const parsed = parsePgn(pgn);
   const meta = gameMetaFromHeaders(parsed.headers, {
     event: 'Игра с движком', date: 'Сегодня', 
