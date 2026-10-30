@@ -2,7 +2,7 @@ import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dist/esm/ches
 
 const PIECES = {
   p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚',
-  P: '♟', N: '♞', B: '♝', R: '♜', Q: '♛', K: '♚'
+  P: '♙', N: '♘', B: '♗', R: '♖', Q: '♕', K: '♔'
 };
 
 export class BoardView {
@@ -30,30 +30,30 @@ export class BoardView {
     this.playerColor = color;
     if (this.orientation !== color) {
       this.orientation = color;
-      this.renderGrid(); // Перерисовываем сетку заново
+      this.renderGrid(); 
       this.setPosition(this.currentFen, { animate: false });
     }
   }
 
   renderGrid() {
     this.el.innerHTML = '<svg id="arrowLayer"></svg>';
-    this.squares = []; // Очищаем массив перед рендером
+    this.squares = [];
     
-    const files = this.orientation === 'w' ? ['a','b','c','d','e','f','g','h'] : ['h','g','f','e','d','c','b','a'];
-    const ranks = this.orientation === 'w' ? [8,7,6,5,4,3,2,1] : [1,2,3,4,5,6,7,8];
+    const rows = this.orientation === 'w' ? [8,7,6,5,4,3,2,1] : [1,2,3,4,5,6,7,8];
+    const cols = this.orientation === 'w' ? ['a','b','c','d','e','f','g','h'] : ['h','g','f','e','d','c','b','a'];
 
     for (let r = 0; r < 8; r++) {
       for (let f = 0; f < 8; f++) {
         const sq = document.createElement('div');
         sq.className = `square ${(r + f) % 2 === 0 ? 'light' : 'dark'}`;
-        sq.dataset.sq = files[f] + ranks[r];
+        sq.dataset.sq = cols[f] + rows[r];
         
         const fileLabel = document.createElement('span');
         fileLabel.className = 'coord file';
-        fileLabel.textContent = files[f];
+        fileLabel.textContent = cols[f];
         const rankLabel = document.createElement('span');
         rankLabel.className = 'coord rank';
-        rankLabel.textContent = ranks[r];
+        rankLabel.textContent = rows[r];
 
         sq.appendChild(fileLabel);
         sq.appendChild(rankLabel);
@@ -138,13 +138,16 @@ export class BoardView {
       if (existing) existing.remove();
     });
 
-    // Проходим по всем клеткам на доске (от a1 до h8)
+    const board = chess.board();
     for (let r = 0; r < 8; r++) {
       for (let f = 0; f < 8; f++) {
-        const piece = chess.board()[r][f];
+        const piece = board[r][f];
         if (!piece) continue;
         
-        const sqName = 'abcdefgh'[f] + (8 - r);
+        const file = 'abcdefgh'[f];
+        const rank = 8 - r;
+        const sqName = file + rank;
+        
         const sq = this.getSquareEl(sqName);
         if (!sq) continue;
 
@@ -165,7 +168,7 @@ export class BoardView {
       const turn = chess.turn();
       for (let r = 0; r < 8; r++) {
         for (let f = 0; f < 8; f++) {
-          const p = chess.board()[r][f];
+          const p = board[r][f];
           if (p && p.type === 'k' && p.color === turn) {
             this.getSquareEl('abcdefgh'[f] + (8 - r))?.classList.add('check');
           }

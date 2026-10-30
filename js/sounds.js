@@ -44,7 +44,6 @@ export class SoundPlayer {
     
     osc.type = type;
     osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-    // Мягкое затухание
     gain.gain.setValueAtTime(volume, this.ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
     

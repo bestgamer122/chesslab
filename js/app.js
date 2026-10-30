@@ -205,12 +205,14 @@ async function startPlayGame() {
   
   const top = $('#topPlayerCard');
   const bot = $('#bottomPlayerCard');
-  top.innerHTML = state.playColor === 'w' 
-    ? `<span class="pc-dot black"></span><div class="pc-main"><strong>Движок Stockfish</strong></div>`
-    : `<span class="pc-dot white"></span><div class="pc-main"><strong>Вы</strong></div>`;
-  bot.innerHTML = state.playColor === 'w'
-    ? `<span class="pc-dot white"></span><div class="pc-main"><strong>Вы</strong></div>`
-    : `<span class="pc-dot black"></span><div class="pc-main"><strong>Движок Stockfish</strong></div>`;
+  
+  if (state.playColor === 'w') {
+    top.innerHTML = `<span class="pc-dot black"></span><div class="pc-main"><strong>Движок Stockfish</strong></div>`;
+    bot.innerHTML = `<span class="pc-dot white"></span><div class="pc-main"><strong>Вы</strong></div>`;
+  } else {
+    top.innerHTML = `<span class="pc-dot white"></span><div class="pc-main"><strong>Вы</strong></div>`;
+    bot.innerHTML = `<span class="pc-dot black"></span><div class="pc-main"><strong>Движок Stockfish</strong></div>`;
+  }
 
   boardPlay.setPlayerColor(state.playColor);
   boardPlay.setPosition(state.playChess.fen(), { animate: false });
@@ -251,11 +253,8 @@ async function makeEngineMove() {
   if (!state.playMode || state.playChess.isGameOver()) return;
   
   try {
-    // Используем время, чтобы движок не думал слишком долго
     const time = state.playElo < 1400 ? 500 : state.playElo < 2000 ? 1000 : 1500;
-
-    // Небольшая задержка для визуала
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 300)); // Небольшая пауза перед отправкой в движок
 
     const ev = await engine.evaluateTime(state.playChess.fen(), time);
     

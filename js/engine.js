@@ -87,8 +87,7 @@ export class Engine {
         }
         
         if (line === 'uciok') {
-          const threads = Math.min(navigator.hardwareConcurrency || 2, 4);
-          this.worker.postMessage('setoption name Threads value ' + threads);
+          this.worker.postMessage('setoption name Threads value 1');
           this.worker.postMessage('setoption name Hash value 128');
           this.worker.postMessage('setoption name UCI_LimitStrength value true');
           this.worker.postMessage('setoption name UCI_Elo value 1200');
@@ -153,7 +152,7 @@ export class Engine {
     }
   }
 
-  evaluate(fen, { depth = 18 } = {}) {
+  evaluate(fen, { depth = 14 } = {}) {
     const run = () => new Promise((resolve, reject) => {
       if (!this.ready) return reject(new Error('Движок не готов'));
       
@@ -176,6 +175,36 @@ export class Engine {
 
       this.worker.postMessage('position fen ' + fen);
       this.worker.postMessage('go depth ' + depth);
+    });
+
+    const p = this.queue.then(run, run);
+    this.queue = p.catch(() => {});
+    return p;
+  }
+
+  evaluateTime(fen, time = 1000) {
+    const run = () => new Promise((resolve, reject) => {
+      if (!this.ready) return reject(new Error('Движок не готов'));
+      
+      const info = { cp: null, mate: null, depth: 0, pv: [] };
+      let isResolved = false;
+      
+      const timeout = setTimeout(() => {
+        if (!isResolved) {
+          this.worker.postMessage('stop');
+          this.current = null;
+          reject(new Error('Превышено время анализа позиции'));
+        }
+      }, time + 5000);
+
+      this.current = {
+        info,
+        resolve: (val) => { isResolved = true; clearTimeout(timeout); resolve(val); },
+        reject: (err) => { isResolved = true; clearTimeout(timeout); reject(err); }
+      };
+
+      this.worker.postMessage('position fen ' + fen);
+      this.worker.postMessage('go movetime ' + time);
     });
 
     const p = this.queue.then(run, run);
