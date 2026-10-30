@@ -15,7 +15,7 @@ const state = {
   game: null, moves: [], analysis: null, ply: 0, orientation: 'w',
   depth: 14, busy: false, runId: 0, searchAbort: null,
   playMode: false, playChess: null, playElo: 1200, playColor: 'w',
-  premove: null
+  playPly: 0, playMoves: [], premove: null
 };
 
 const settings = new Settings();
@@ -176,6 +176,12 @@ function bindEvents() {
   $('#nextBtn').addEventListener('click', () => goToPly(state.ply + 1));
   $('#lastBtn').addEventListener('click', () => goToPly(state.moves.length));
   $('#flipBtn').addEventListener('click', () => board.flip());
+
+  // Навигация в игре
+  $('#firstPlayBtn').addEventListener('click', () => goToPlayPly(0));
+  $('#prevPlayBtn').addEventListener('click', () => goToPlayPly(state.playPly - 1));
+  $('#nextPlayBtn').addEventListener('click', () => goToPlayPly(state.playPly + 1));
+  $('#lastPlayBtn').addEventListener('click', () => goToPlayPly(state.playMoves.length));
   $('#flipPlayBtn').addEventListener('click', () => boardPlay.flip());
   
   $('#moveList').addEventListener('click', (e) => {
@@ -183,8 +189,22 @@ function bindEvents() {
     if (btn) goToPly(parseInt(btn.dataset.ply, 10));
   });
 
+  $('#playMoveList').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-play-ply]');
+    if (btn) goToPlayPly(parseInt(btn.dataset.playPly, 10));
+  });
+
   document.addEventListener('keydown', (e) => {
     if (e.target.matches('input, textarea, select')) return;
+    
+    if (!$('#playView').classList.contains('hidden') && state.playMode) {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); goToPlayPly(state.playPly - 1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); goToPlayPly(state.playPly + 1); }
+      if (e.key === 'Home') { e.preventDefault(); goToPlayPly(0); }
+      if (e.key === 'End') { e.preventDefault(); goToPlayPly(state.playMoves.length); }
+      return;
+    }
+
     if (!$('#analysisView').classList.contains('hidden') && state.game) {
       if (e.key === 'ArrowLeft') { e.preventDefault(); goToPly(state.ply - 1); }
       if (e.key === 'ArrowRight') { e.preventDefault(); goToPly(state.ply + 1); }
@@ -211,7 +231,9 @@ async function startPlayGame() {
   state.playMode = true;
   state.playChess = new Chess();
   state.playMoves = [];
+  state.playPly = 0;
   state.premove = null;
+  boardPlay.premove = null;
   
   $('#playDiffText').textContent = `${state.playElo} ELO`;
   $('#playColorText').textContent = state.playColor === 'w' ? 'Вы играете белыми' : 'Вы играете чёрными';
@@ -227,6 +249,7 @@ async function startPlayGame() {
     bot.innerHTML = `<span class="pc-dot black"></span><div class="pc-main"><strong>Движок Stockfish</strong></div>`;
   }
 
+  boardPlay.isLive = true;
   boardPlay.setPlayerColor(state.playColor);
   boardPlay.setPosition(state.playChess.fen(), { animate: false });
   boardPlay.setInteractive(true);
@@ -251,7 +274,8 @@ async function handlePlayerMove(move) {
 
   if (move.isPremove) {
     state.premove = move;
-    boardPlay.setPosition(state.playChess.fen(), { animate: false }); // Перерисовка с премувом
+    boardPlay.premove = move;
+    boardPlay.setPosition(state.playChess.fen(), { animate: false });
     return;
   }
 
@@ -261,6 +285,8 @@ async function handlePlayerMove(move) {
   state.playChess.move(move);
   state.playMoves.push(move.san);
   state.premove = null;
+  boardPlay.premove = null;
+  state.playPly = state.playMoves.length;
   
   boardPlay.setPosition(state.playChess.fen(), { from: move.from, to: move.to });
   updatePlayList();
@@ -291,6 +317,7 @@ async function makeEngineMove() {
     if (move) {
       playSound(move, state.playChess);
       state.playMoves.push(move.san);
+      state.playPly = state.playMoves.length;
       boardPlay.setPosition(state.playChess.fen(), { from: move.from, to: move.to });
       updatePlayList();
       
@@ -300,15 +327,15 @@ async function makeEngineMove() {
       if (state.premove) {
         const pm = state.premove;
         state.premove = null;
+        boardPlay.premove = null;
         
-        // Проверяем, легален ли премув
         const testChess = new Chess(state.playChess.fen());
         try {
           const pmMove = testChess.move({ from: pm.from, to: pm.to, promotion: 'q' });
           if (pmMove) {
             // Премув легален, делаем его!
-            setTimeout(() => handlePlayerMove(pmMove), 50);
-            return; // Выходим, чтобы не включать интерактив (премув сам его выключит)
+            setTimeout(() => handlePlayerMove(pmMove), 250);
+            return; 
           }
         } catch (_) {}
         
@@ -325,6 +352,31 @@ async function makeEngineMove() {
       boardPlay.setInteractive(true);
     }
   }
+}
+
+function goToPlayPly(ply) {
+  if (!state.playChess) return;
+  
+  state.playPly = Math.max(0, Math.min(state.playMoves.length, ply));
+  
+  const tempChess = new Chess();
+  for(let i=0; i<state.playPly; i++) {
+    tempChess.move(state.playMoves[i]);
+  }
+  
+  const lastMove = state.playPly > 0 ? state.playMoves[state.playPly - 1] : null;
+  boardPlay.setPosition(tempChess.fen(), { 
+    from: lastMove?.from, to: lastMove?.to, 
+    animate: true 
+  });
+  
+  updatePlayList();
+  
+  const isLive = state.playPly === state.playMoves.length;
+  boardPlay.isLive = isLive;
+  
+  const isPlayerTurn = tempChess.turn() === state.playColor;
+  boardPlay.setInteractive(isLive && isPlayerTurn && !tempChess.isGameOver());
 }
 
 function checkGameOver() {
@@ -344,19 +396,23 @@ function updatePlayList() {
   let html = '';
   for (let i = 0; i < state.playMoves.length; i += 2) {
     html += `<div class="move-row"><div class="move-no">${i/2 + 1}.</div>`;
-    html += `<div class="move-btn">${state.playMoves[i]}</div>`;
-    html += i+1 < state.playMoves.length ? `<div class="move-btn">${state.playMoves[i+1]}</div>` : '<div></div>';
+    html += `<button class="move-btn ${state.playPly === i+1 ? 'active' : ''}" data-play-ply="${i+1}">${state.playMoves[i]}</button>`;
+    html += i+1 < state.playMoves.length ? `<button class="move-btn ${state.playPly === i+2 ? 'active' : ''}" data-play-ply="${i+2}">${state.playMoves[i+1]}</button>` : '<div></div>';
     html += '</div>';
   }
   el.innerHTML = html;
   $('#playMoveCount').textContent = state.playMoves.length + ' ходов';
-  $('#playMoveCounter').textContent = `Ход ${Math.ceil(state.playMoves.length/2)}`;
+  $('#playMoveCounter').textContent = `Ход ${Math.ceil(state.playPly/2)} / ${Math.ceil(state.playMoves.length/2)}`;
+
+  const active = el.querySelector('.move-btn.active');
+  if (active) active.scrollIntoView({ block: 'nearest' });
 }
 
 function finishPlayGame() {
   if (state.playMoves.length < 2) return toast('Сделайте хотя бы пару ходов', 'error');
   state.playMode = false;
   state.premove = null;
+  boardPlay.premove = null;
   boardPlay.setInteractive(false);
   
   const pgn = state.playChess.pgn();
@@ -485,6 +541,7 @@ function goHome() {
   cancelAnalysis(true);
   state.playMode = false;
   state.premove = null;
+  boardPlay.premove = null;
   $('#analysisView').classList.add('hidden');
   $('#playView').classList.add('hidden');
   $('#homeView').classList.remove('hidden');

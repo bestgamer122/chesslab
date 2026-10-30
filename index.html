@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/styles.css?v=40">
+  <link rel="stylesheet" href="css/styles.css?v=45">
 </head>
 <body>
 
@@ -115,7 +115,13 @@
         </div>
 
         <div class="board-controls">
-          <span class="move-counter" id="playMoveCounter">Ход 0</span>
+          <div class="nav-group">
+            <button class="icon-btn" id="firstPlayBtn" type="button">«</button>
+            <button class="icon-btn" id="prevPlayBtn" type="button">‹</button>
+            <button class="icon-btn" id="nextPlayBtn" type="button">›</button>
+            <button class="icon-btn" id="lastPlayBtn" type="button">»</button>
+          </div>
+          <span class="move-counter" id="playMoveCounter">Ход 0 / 0</span>
           <button class="icon-btn" id="flipPlayBtn" type="button">⇅</button>
         </div>
 
@@ -326,6 +332,6 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<script type="module" src="js/app.js?v=40"></script>
+<script type="module" src="js/app.js?v=45"></script>
 </body>
 </html>
