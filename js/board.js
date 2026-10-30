@@ -15,6 +15,7 @@ export class BoardView {
     this.squares = [];
     this.selectedSq = null;
     this.interactive = false;
+    this.playerColor = 'w';
     
     this.renderGrid();
     this.updateStyles();
@@ -22,8 +23,13 @@ export class BoardView {
 
   setInteractive(state) {
     this.interactive = state;
-    if (!state) {
-      this.clearSelection();
+    if (!state) this.clearSelection();
+  }
+
+  setPlayerColor(color) {
+    this.playerColor = color;
+    if (this.orientation !== color) {
+      this.flip();
     }
   }
 
@@ -72,6 +78,7 @@ export class BoardView {
     if (!this.interactive || !this.onMove) return;
     
     const chess = new Chess(this.currentFen);
+    if (chess.turn() !== this.playerColor) return;
     
     if (this.selectedSq) {
       if (this.selectedSq === sq) {
@@ -79,13 +86,16 @@ export class BoardView {
         return;
       }
       
-      // Пробуем сделать ход
-      const move = chess.move({ from: this.selectedSq, to: sq, promotion: 'q' });
-      if (move) {
-        this.onMove(move);
-        this.clearSelection();
-      } else {
-        // Если ход невозможен, выделяем другую фигуру
+      try {
+        const move = chess.move({ from: this.selectedSq, to: sq, promotion: 'q' });
+        if (move) {
+          this.onMove(move);
+          this.clearSelection();
+        } else {
+          this.clearSelection();
+          this._selectSquare(sq, chess);
+        }
+      } catch (_) {
         this.clearSelection();
         this._selectSquare(sq, chess);
       }
@@ -96,11 +106,10 @@ export class BoardView {
 
   _selectSquare(sq, chess) {
     const piece = chess.get(sq);
-    if (piece && piece.color === chess.turn()) {
+    if (piece && piece.color === this.playerColor) {
       this.selectedSq = sq;
       this.getSquareEl(sq).classList.add('selected');
       
-      // Показываем возможные ходы
       const moves = chess.moves({ square: sq, verbose: true });
       moves.forEach(m => {
         const el = this.getSquareEl(m.to);

@@ -14,7 +14,7 @@ const $ = (s) => document.querySelector(s);
 const state = {
   game: null, moves: [], analysis: null, ply: 0, orientation: 'w',
   depth: 14, busy: false, runId: 0, searchAbort: null,
-  playMode: false, playChess: null, playDiff: 2
+  playMode: false, playChess: null, playElo: 1200, playColor: 'w'
 };
 
 const settings = new Settings();
@@ -38,7 +38,6 @@ function init() {
   });
   
   initCustomSelect('themeCustomSelect', settings.get('boardTheme') || 'green', () => {});
-  initCustomSelect('diffCustomSelect', '2', (val) => { state.playDiff = parseInt(val, 10); });
 
   bindEvents();
   renderSummary();
@@ -134,6 +133,24 @@ function bindEvents() {
   // Игра
   $('#playEngineBtn').addEventListener('click', () => $('#playSetupModal').classList.remove('hidden'));
   $('#playSetupCloseBtn').addEventListener('click', () => $('#playSetupModal').classList.add('hidden'));
+  
+  $('#eloSlider').addEventListener('input', (e) => {
+    $('#eloValue').textContent = e.target.value;
+    state.playElo = parseInt(e.target.value, 10);
+  });
+
+  document.querySelectorAll('.play-color-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      document.querySelectorAll('.play-color-btn').forEach(b => {
+        b.classList.remove('btn-primary', 'active');
+        b.classList.add('btn-ghost');
+      });
+      e.target.classList.remove('btn-ghost');
+      e.target.classList.add('btn-primary', 'active');
+      state.playColor = e.target.dataset.color;
+    });
+  });
+
   $('#startPlayBtn').addEventListener('click', startPlayGame);
   $('#finishGameBtn').addEventListener('click', finishPlayGame);
   $('#backFromPlayBtn').addEventListener('click', goHome);
@@ -183,23 +200,40 @@ async function startPlayGame() {
   state.playChess = new Chess();
   state.playMoves = [];
   
-  const diffText = { 1: 'Легко', 2: 'Средний', 3: 'Сложно' }[state.playDiff];
-  $('#playDiffText').textContent = diffText;
+  $('#playDiffText').textContent = `${state.playElo} ELO`;
+  $('#playColorText').textContent = state.playColor === 'w' ? 'Вы играете белыми' : 'Вы играете чёрными';
   
+  // Меняем плашки игроков местами
+  const top = $('#topPlayerCard');
+  const bot = $('#bottomPlayerCard');
+  top.innerHTML = state.playColor === 'w' 
+    ? `<span class="pc-dot black"></span><div class="pc-main"><strong>Движок Stockfish</strong></div>`
+    : `<span class="pc-dot white"></span><div class="pc-main"><strong>Вы</strong></div>`;
+  bot.innerHTML = state.playColor === 'w'
+    ? `<span class="pc-dot white"></span><div class="pc-main"><strong>Вы</strong></div>`
+    : `<span class="pc-dot black"></span><div class="pc-main"><strong>Движок Stockfish</strong></div>`;
+
+  boardPlay.setPlayerColor(state.playColor);
   boardPlay.setPosition(state.playChess.fen(), { animate: false });
   boardPlay.setInteractive(true);
   updatePlayList();
   
   try {
     await engine.init(status => setEngineState(status));
-    toast('Игра началась. Ваш ход!');
+    engine.setElo(state.playElo);
+    toast('Игра началась');
+    
+    if (state.playColor === 'b') {
+      boardPlay.setInteractive(false);
+      makeEngineMove();
+    }
   } catch (err) {
     toast(err.message, 'error');
   }
 }
 
 async function handlePlayerMove(move) {
-  if (!state.playMode || state.playChess.turn() !== 'w') return;
+  if (!state.playMode || state.playChess.turn() !== state.playColor) return;
   
   playSound(move, state.playChess);
   state.playChess.move(move);
@@ -210,17 +244,19 @@ async function handlePlayerMove(move) {
   
   if (checkGameOver()) return;
   
-  // Ход движка
   boardPlay.setInteractive(false);
-  await makeEngineMove();
+  makeEngineMove();
 }
 
 async function makeEngineMove() {
   if (!state.playMode || state.playChess.isGameOver()) return;
   
   try {
-    const depth = state.playDiff === 1 ? 1 : state.playDiff === 2 ? 8 : 14;
-    const ev = await engine.evaluate(state.playChess.fen(), { depth });
+    // Искусственная задержка для реалистичности
+    const delay = state.playElo < 1400 ? 600 : state.playElo < 2000 ? 1000 : 1500;
+    await new Promise(r => setTimeout(r, delay));
+
+    const ev = await engine.evaluate(state.playChess.fen(), { depth: 18 });
     
     if (!ev.bestMove || !state.playMode) return;
     
@@ -250,7 +286,7 @@ function checkGameOver() {
   if (state.playChess.isGameOver()) {
     boardPlay.setInteractive(false);
     let msg = 'Игра окончена. ';
-    if (state.playChess.isCheckmate()) msg += state.playChess.turn() === 'w' ? 'Вам мат.' : 'Вы победили!';
+    if (state.playChess.isCheckmate()) msg += state.playChess.turn() === state.playColor ? 'Вам мат.' : 'Вы победили!';
     else if (state.playChess.isDraw()) msg += 'Ничья.';
     toast(msg);
     return true;
@@ -280,9 +316,12 @@ function finishPlayGame() {
   const pgn = state.playChess.pgn();
   const parsed = parsePgn(pgn);
   const meta = gameMetaFromHeaders(parsed.headers, {
-    event: 'Игра с движком', date: 'Сегодня', whiteName: 'Вы', blackName: 'Stockfish', result: '*'
+    event: 'Игра с движком', date: 'Сегодня', 
+    whiteName: state.playColor === 'w' ? 'Вы' : `Stockfish ${state.playElo}`,
+    blackName: state.playColor === 'w' ? `Stockfish ${state.playElo}` : 'Вы', 
+    result: '*'
   });
-  loadGame(parsed, meta, 'w');
+  loadGame(parsed, meta, state.playColor);
 }
 
 // ================= ЗАГРУЗКА ПАРТИЙ =================
@@ -422,6 +461,9 @@ async function startAnalysis(isManual) {
     await engine.init(status => setEngineState(status));
     if (runId !== state.runId) return;
 
+    // Сбрасываем ELO-лимит на полную силу для анализа
+    if (engine.worker) engine.worker.postMessage('setoption name UCI_LimitStrength value false');
+
     const analysis = await analyzeGame({
       moves: state.moves, startFen: state.game.startFen, engine, depth: state.depth,
       isCancelled: () => runId !== state.runId,
@@ -436,7 +478,6 @@ async function startAnalysis(isManual) {
     goToPly(state.ply);
     graph.setData(analysis.points, state.ply);
     
-    // Запускаем анимацию цифр
     animateAccuracy(state.analysis.summary.w.accuracy, state.analysis.summary.b.accuracy, state.analysis.summary.w.acpl, state.analysis.summary.b.acpl);
 
     if (isManual) toast('Готово');
@@ -615,21 +656,17 @@ function animateAccuracy(targetW, targetB, acplW, acplB) {
 
   function step(timestamp) {
     const progress = Math.min((timestamp - start) / duration, 1);
-    const easeOut = 1 - Math.pow(1 - progress, 3); // Cubic ease-out
+    const easeOut = 1 - Math.pow(1 - progress, 3);
     
-    // Точность
     wAccNum.textContent = (targetW * easeOut).toFixed(1) + '%';
     bAccNum.textContent = (targetB * easeOut).toFixed(1) + '%';
     wAccBar.style.width = (targetW * easeOut) + '%';
     bAccBar.style.width = (targetB * easeOut) + '%';
     
-    // ACPL
     wAcplNum.textContent = Math.round(acplW * easeOut);
     bAcplNum.textContent = Math.round(acplB * easeOut);
 
-    if (progress < 1) {
-      requestAnimationFrame(step);
-    }
+    if (progress < 1) requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
 }

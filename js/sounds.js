@@ -22,26 +22,53 @@ export class SoundPlayer {
   playMove() {
     if (!this.enabled) return;
     this.init();
-    if (!this.ctx) return;
-    this._playTone(300, 'sine', 0.1, 0.05);
+    this._playClick(0.1, 800); // Глухой стук
   }
 
   playCapture() {
     if (!this.enabled) return;
     this.init();
-    if (!this.ctx) return;
-    this._playTone(150, 'triangle', 0.15, 0.08);
+    this._playClick(0.15, 400); // Более тяжелый стук
   }
 
   playCheck() {
     if (!this.enabled) return;
     this.init();
+    this._playTone(600, 'sine', 0.15, 0.1);
+    setTimeout(() => this._playTone(800, 'sine', 0.15, 0.1), 120);
+  }
+
+  _playClick(duration, filterFreq) {
     if (!this.ctx) return;
-    this._playTone(800, 'square', 0.1, 0.1);
-    setTimeout(() => this._playTone(900, 'square', 0.1, 0.1), 100);
+    const bufferSize = this.ctx.sampleRate * duration;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    
+    // Генерируем шум для реалистичного стука
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = filterFreq;
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    noise.start();
   }
 
   _playTone(freq, type, duration, volume) {
+    if (!this.ctx) return;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     

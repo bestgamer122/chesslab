@@ -87,10 +87,11 @@ export class Engine {
         }
         
         if (line === 'uciok') {
-          // Выделяем движку максимум ресурсов для силы
           const threads = Math.min(navigator.hardwareConcurrency || 2, 4);
           this.worker.postMessage('setoption name Threads value ' + threads);
           this.worker.postMessage('setoption name Hash value 128');
+          this.worker.postMessage('setoption name UCI_LimitStrength value true');
+          this.worker.postMessage('setoption name UCI_Elo value 1200');
           this.worker.postMessage('isready');
           return;
         }
@@ -144,6 +145,12 @@ export class Engine {
     });
 
     return this.initPromise;
+  }
+
+  setElo(elo) {
+    if (this.worker) {
+      this.worker.postMessage('setoption name UCI_Elo value ' + elo);
+    }
   }
 
   evaluate(fen, { depth = 18 } = {}) {
